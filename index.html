@@ -1,13 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>영단어 암기장</title>
+    <title>영단어 암기장 (TOEIC 800~900)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔤</text></svg>" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div class="wrap">
+      <header class="top">
+        <div class="brand">🔤 영단어 암기장</div>
+        <div class="tag">TOEIC 800~900 필수 어휘 · 플래시카드로 외우고, 퀴즈로 확인하세요</div>
+      </header>
+      <nav class="tabs" id="tabs"></nav>
+      <main class="panel" id="panel"></main>
+    </div>
+
+    <script src="words.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>
