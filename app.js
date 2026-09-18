@@ -70,6 +70,7 @@
     write: { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] },
     wordQuery: '',
     wordStatus: 'all',
+    confirmingReset: false,
   };
 
   function getPool() {
@@ -256,11 +257,9 @@
       });
   }
 
-  function buildQuestions(count) {
-    var pool = getPool();
-    var chosen = shuffle(pool).slice(0, count);
-    return chosen.map(function (word) {
-      var distractorPool = pool.length > 4 ? pool : WORDS;
+  function buildQuestionsFromWords(words) {
+    var distractorPool = words.length > 4 ? words : WORDS;
+    return shuffle(words).map(function (word) {
       var distractors = shuffle(
         distractorPool.filter(function (w) {
           return w.id !== word.id;
@@ -272,6 +271,11 @@
         });
       return { word: word, options: shuffle([word.ko].concat(distractors)) };
     });
+  }
+
+  function buildQuestions(count) {
+    var pool = getPool();
+    return buildQuestionsFromWords(shuffle(pool).slice(0, count));
   }
 
   function quizSetupCounts() {
@@ -330,8 +334,19 @@
         q.questions.length +
         ' 정답</p>' +
         wrongHtml +
-        '<button class="btn btn-primary" id="retry-quiz">다시 풀기</button>';
-      document.getElementById('retry-quiz').addEventListener('click', function () {
+        '<div class="setup-row">' +
+        (q.wrong.length > 0 ? '<button class="btn btn-bad" id="retry-wrong">틀린 것만 다시 풀기</button>' : '') +
+        '<button class="btn btn-primary" id="retry-all">전체 다시 풀기</button>' +
+        '</div>';
+      var retryWrongBtn = document.getElementById('retry-wrong');
+      if (retryWrongBtn) {
+        retryWrongBtn.addEventListener('click', function () {
+          var wrongWords = q.wrong.slice();
+          state.quiz = { stage: 'playing', questions: buildQuestionsFromWords(wrongWords), index: 0, selected: null, score: 0, wrong: [] };
+          render();
+        });
+      }
+      document.getElementById('retry-all').addEventListener('click', function () {
         state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
         render();
       });
@@ -463,8 +478,29 @@
         w.items.length +
         ' 정답</p>' +
         wrongHtml +
-        '<button class="btn btn-primary" id="retry-write">다시 풀기</button>';
-      document.getElementById('retry-write').addEventListener('click', function () {
+        '<div class="setup-row">' +
+        (w.wrong.length > 0 ? '<button class="btn btn-bad" id="retry-write-wrong">틀린 것만 다시 풀기</button>' : '') +
+        '<button class="btn btn-primary" id="retry-write-all">전체 다시 풀기</button>' +
+        '</div>';
+      var retryWriteWrongBtn = document.getElementById('retry-write-wrong');
+      if (retryWriteWrongBtn) {
+        retryWriteWrongBtn.addEventListener('click', function () {
+          var wrongWords = w.wrong.map(function (item) {
+            return item.word;
+          });
+          state.write = {
+            stage: 'playing',
+            items: shuffle(wrongWords),
+            index: 0,
+            input: '',
+            submitted: false,
+            score: 0,
+            wrong: [],
+          };
+          render();
+        });
+      }
+      document.getElementById('retry-write-all').addEventListener('click', function () {
         state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         render();
       });
@@ -577,6 +613,16 @@
         })
         .join('') || '<li class="empty">검색 결과가 없어요.</li>';
 
+    var resetControlHtml = state.confirmingReset
+      ? '<div class="reset-confirm">' +
+        '<span>정말 초기화할까요? 모든 학습 기록이 사라져요.</span>' +
+        '<div class="reset-confirm-actions">' +
+        '<button class="btn btn-bad" id="reset-confirm-yes">초기화</button>' +
+        '<button class="btn btn-primary" id="reset-confirm-no">취소</button>' +
+        '</div>' +
+        '</div>'
+      : '<button class="reset-btn" id="reset-btn">진행 초기화</button>';
+
     panel.innerHTML =
       '<div class="controls-row">' +
       '<input class="search" id="search-input" type="text" placeholder="단어 또는 뜻 검색" value="' +
@@ -588,7 +634,7 @@
       '<option value="learning">학습중</option>' +
       '<option value="known">암기완료</option>' +
       '</select>' +
-      '<button class="reset-btn" id="reset-btn">진행 초기화</button>' +
+      resetControlHtml +
       '</div>' +
       '<ul class="wlist">' +
       rows +
@@ -603,13 +649,23 @@
       state.wordStatus = e.target.value;
       render();
     });
-    document.getElementById('reset-btn').addEventListener('click', function () {
-      if (window.confirm('모든 학습 진행 상황을 초기화할까요?')) {
+    if (state.confirmingReset) {
+      document.getElementById('reset-confirm-yes').addEventListener('click', function () {
         resetProgress();
+        state.confirmingReset = false;
         buildDeck();
         render();
-      }
-    });
+      });
+      document.getElementById('reset-confirm-no').addEventListener('click', function () {
+        state.confirmingReset = false;
+        render();
+      });
+    } else {
+      document.getElementById('reset-btn').addEventListener('click', function () {
+        state.confirmingReset = true;
+        render();
+      });
+    }
   }
 
   function renderStats() {

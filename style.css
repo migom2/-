@@ -424,6 +424,27 @@ button.btn {
   cursor: pointer;
 }
 
+.reset-confirm {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+  font-size: 13px;
+}
+.reset-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+.reset-confirm-actions .btn {
+  padding: 9px;
+  font-size: 13px;
+}
+
 .wlist {
   list-style: none;
   margin: 0;
