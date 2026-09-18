@@ -91,16 +91,6 @@
   function genId() {
     return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
-  function todayKey() {
-    var d = new Date();
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
-  }
-  function formatDateLabel(key) {
-    return key.split('-').join('.');
-  }
 
   var state = {
     day: 'all',
@@ -118,6 +108,7 @@
     wordStatus: 'all',
     confirmingReset: false,
     manage: {
+      targetCategoryId: null,
       newEn: '',
       newKo: '',
       newExample: '',
@@ -138,29 +129,20 @@
     return null;
   }
 
-  function ensureDateCategory(dateKey) {
-    var existing = findCategory(dateKey);
-    if (existing) return existing.id;
-    state.customCategories.push({ id: dateKey, name: formatDateLabel(dateKey), createdAt: Date.now() });
-    saveCustomCategories();
-    return dateKey;
-  }
-
-  function addCustomWord(en, ko, example) {
+  function addCustomWord(en, ko, example, categoryId) {
     en = (en || '').trim();
     ko = (ko || '').trim();
     example = (example || '').trim();
-    if (!en || !ko) return false;
-    var categoryId = ensureDateCategory(todayKey());
+    if (!en || !ko || !findCategory(categoryId)) return false;
     state.customWords.push({ id: genId(), en: en, ko: ko, example: example, categoryId: categoryId, createdAt: Date.now() });
     saveCustomWords();
     return true;
   }
 
-  function addCustomWordsBulk(text) {
+  function addCustomWordsBulk(text, categoryId) {
+    if (!findCategory(categoryId)) return 0;
     var lines = (text || '').split('\n');
     var added = 0;
-    var categoryId = ensureDateCategory(todayKey());
     lines.forEach(function (line) {
       line = line.trim();
       if (!line) return;
@@ -228,6 +210,9 @@
     saveProgress();
     if (state.day === 'custom-' + categoryId) {
       state.day = 'all';
+    }
+    if (state.manage.targetCategoryId === categoryId) {
+      state.manage.targetCategoryId = state.customCategories.length > 0 ? state.customCategories[0].id : null;
     }
     buildDeck();
   }
@@ -897,6 +882,10 @@
       return b.createdAt - a.createdAt;
     });
 
+    if (!findCategory(m.targetCategoryId)) {
+      m.targetCategoryId = sortedCats.length > 0 ? sortedCats[0].id : null;
+    }
+
     var addCategoryHtml = m.addingCategory
       ? '<div class="inline-form">' +
         '<input type="text" id="new-category-input" class="search" placeholder="카테고리 이름" value="' +
@@ -911,7 +900,7 @@
 
     var categoriesHtml;
     if (sortedCats.length === 0) {
-      categoriesHtml = '<p class="hint">아직 카테고리가 없어요. 단어를 추가하면 오늘 날짜로 자동 생성돼요.</p>';
+      categoriesHtml = '<p class="hint">아직 카테고리가 없어요. 아래에서 카테고리를 먼저 만들어보세요.</p>';
     } else {
       categoriesHtml = sortedCats
         .map(function (cat) {
@@ -1020,86 +1009,112 @@
         .join('');
     }
 
+    var categoryOptionsForAdd = sortedCats
+      .map(function (c) {
+        return '<option value="' + c.id + '">' + esc(c.name) + '</option>';
+      })
+      .join('');
+
+    var addWordsSectionHtml;
+    if (sortedCats.length === 0) {
+      addWordsSectionHtml =
+        '<div class="manage-card"><p class="hint">단어를 추가하려면 먼저 카테고리를 만들어주세요.</p></div>';
+    } else {
+      addWordsSectionHtml =
+        '<div class="manage-card">' +
+        '<h3>담을 카테고리</h3>' +
+        '<select class="select full-width" id="target-category-select">' +
+        categoryOptionsForAdd +
+        '</select>' +
+        '</div>' +
+        '<div class="manage-card">' +
+        '<h3>단어 추가</h3>' +
+        '<div class="manage-row2">' +
+        '<input type="text" id="new-en" class="search" placeholder="영단어" value="' +
+        esc(m.newEn) +
+        '" />' +
+        '<input type="text" id="new-ko" class="search" placeholder="뜻" value="' +
+        esc(m.newKo) +
+        '" />' +
+        '</div>' +
+        '<input type="text" id="new-example" class="search full-width" placeholder="예문 (선택)" value="' +
+        esc(m.newExample) +
+        '" />' +
+        '<button class="btn btn-primary full-width" id="add-word-btn">추가</button>' +
+        '</div>' +
+        '<div class="manage-card">' +
+        '<h3>여러 단어 한 번에 추가</h3>' +
+        '<textarea id="bulk-input" class="bulk-textarea" placeholder="한 줄에 하나씩, &quot;영단어 - 뜻&quot; 형식으로 입력하세요.\n예) aircraft - 항공기">' +
+        esc(m.bulkText) +
+        '</textarea>' +
+        '<div class="setup-row" style="margin-top:8px;">' +
+        '<button class="btn btn-primary" id="add-bulk-btn">목록에 반영</button>' +
+        '<button class="btn btn-bad" id="clear-bulk-btn">지우기</button>' +
+        '</div>' +
+        '</div>';
+    }
+
     panel.innerHTML =
       '<h2>내 단어장</h2>' +
-      '<p class="hint" style="margin-bottom:16px;">직접 단어를 추가해보세요. 추가한 날짜별로 자동 정리되고, 카테고리를 만들어 원하는 대로 묶을 수도 있어요.</p>' +
-      '<div class="manage-card">' +
-      '<h3>단어 추가</h3>' +
-      '<div class="manage-row2">' +
-      '<input type="text" id="new-en" class="search" placeholder="영단어" value="' +
-      esc(m.newEn) +
-      '" />' +
-      '<input type="text" id="new-ko" class="search" placeholder="뜻" value="' +
-      esc(m.newKo) +
-      '" />' +
-      '</div>' +
-      '<input type="text" id="new-example" class="search full-width" placeholder="예문 (선택)" value="' +
-      esc(m.newExample) +
-      '" />' +
-      '<button class="btn btn-primary full-width" id="add-word-btn">추가</button>' +
-      '<p class="hint" style="margin-top:8px;">오늘(' +
-      formatDateLabel(todayKey()) +
-      ') 날짜 묶음으로 자동 분류돼요.</p>' +
-      '</div>' +
-      '<div class="manage-card">' +
-      '<h3>여러 단어 한 번에 추가</h3>' +
-      '<textarea id="bulk-input" class="bulk-textarea" placeholder="한 줄에 하나씩, &quot;영단어 - 뜻&quot; 형식으로 입력하세요.\n예) aircraft - 항공기">' +
-      esc(m.bulkText) +
-      '</textarea>' +
-      '<div class="setup-row" style="margin-top:8px;">' +
-      '<button class="btn btn-primary" id="add-bulk-btn">목록에 반영</button>' +
-      '<button class="btn btn-bad" id="clear-bulk-btn">지우기</button>' +
-      '</div>' +
-      '</div>' +
+      '<p class="hint" style="margin-bottom:16px;">카테고리를 만들고, 원하는 카테고리에 단어를 추가해보세요.</p>' +
       '<div class="manage-card">' +
       '<div class="manage-card-head"><h3>카테고리</h3>' +
       addCategoryHtml +
       '</div>' +
       categoriesHtml +
-      '</div>';
+      '</div>' +
+      addWordsSectionHtml;
 
-    document.getElementById('new-en').addEventListener('input', function (e) {
-      m.newEn = e.target.value;
-    });
-    document.getElementById('new-ko').addEventListener('input', function (e) {
-      m.newKo = e.target.value;
-    });
-    document.getElementById('new-example').addEventListener('input', function (e) {
-      m.newExample = e.target.value;
-    });
-    function submitNewWord() {
-      if (addCustomWord(m.newEn, m.newKo, m.newExample)) {
-        m.newEn = '';
-        m.newKo = '';
-        m.newExample = '';
-        buildDeck();
+    if (sortedCats.length > 0) {
+      var targetSelect = document.getElementById('target-category-select');
+      targetSelect.value = m.targetCategoryId;
+      targetSelect.addEventListener('change', function (e) {
+        m.targetCategoryId = e.target.value;
+      });
+
+      document.getElementById('new-en').addEventListener('input', function (e) {
+        m.newEn = e.target.value;
+      });
+      document.getElementById('new-ko').addEventListener('input', function (e) {
+        m.newKo = e.target.value;
+      });
+      document.getElementById('new-example').addEventListener('input', function (e) {
+        m.newExample = e.target.value;
+      });
+      var submitNewWord = function () {
+        if (addCustomWord(m.newEn, m.newKo, m.newExample, m.targetCategoryId)) {
+          m.newEn = '';
+          m.newKo = '';
+          m.newExample = '';
+          buildDeck();
+          render();
+        }
+      };
+      document.getElementById('add-word-btn').addEventListener('click', submitNewWord);
+      document.getElementById('new-en').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') submitNewWord();
+      });
+      document.getElementById('new-ko').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') submitNewWord();
+      });
+
+      var bulkInput = document.getElementById('bulk-input');
+      bulkInput.addEventListener('input', function (e) {
+        m.bulkText = e.target.value;
+      });
+      document.getElementById('add-bulk-btn').addEventListener('click', function () {
+        var added = addCustomWordsBulk(m.bulkText, m.targetCategoryId);
+        if (added > 0) {
+          m.bulkText = '';
+          buildDeck();
+        }
         render();
-      }
-    }
-    document.getElementById('add-word-btn').addEventListener('click', submitNewWord);
-    document.getElementById('new-en').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') submitNewWord();
-    });
-    document.getElementById('new-ko').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') submitNewWord();
-    });
-
-    var bulkInput = document.getElementById('bulk-input');
-    bulkInput.addEventListener('input', function (e) {
-      m.bulkText = e.target.value;
-    });
-    document.getElementById('add-bulk-btn').addEventListener('click', function () {
-      var added = addCustomWordsBulk(m.bulkText);
-      if (added > 0) {
+      });
+      document.getElementById('clear-bulk-btn').addEventListener('click', function () {
         m.bulkText = '';
-        buildDeck();
-      }
-      render();
-    });
-    document.getElementById('clear-bulk-btn').addEventListener('click', function () {
-      m.bulkText = '';
-      render();
-    });
+        render();
+      });
+    }
 
     if (m.addingCategory) {
       var catInput = document.getElementById('new-category-input');
@@ -1127,6 +1142,7 @@
       if (id) {
         m.addingCategory = false;
         m.newCategoryName = '';
+        m.targetCategoryId = id;
         render();
       }
     }
