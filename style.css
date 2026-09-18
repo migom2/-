@@ -73,6 +73,21 @@ header.top .tag {
   line-height: 1.5;
 }
 
+.day-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.day-row label {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.day-row .select {
+  flex: 1;
+}
+
 nav.tabs {
   position: sticky;
   top: 0;
@@ -82,17 +97,18 @@ nav.tabs {
   background: var(--bg);
   padding-bottom: 10px;
   margin-bottom: 14px;
+  overflow-x: auto;
 }
 
 nav.tabs button {
-  flex: 1;
+  flex: 0 0 auto;
   font: inherit;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  padding: 10px 2px 9px;
+  padding: 10px 10px 9px;
   border: 1px solid var(--line);
   border-bottom: none;
   border-radius: 10px 10px 0 0;
@@ -523,6 +539,97 @@ button.btn {
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   font-size: 16px;
   margin: 0 0 6px;
+}
+
+.write-prompt {
+  text-align: center;
+  padding: 20px 10px;
+  margin-bottom: 14px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.write-ko {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: 26px;
+  margin: 0;
+  word-break: break-word;
+}
+
+.write-input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.write-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.write-input.correct {
+  border-color: var(--good);
+  background: var(--good-soft);
+  color: var(--good);
+}
+.write-input.wrong {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.write-feedback {
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.write-feedback.good {
+  color: var(--good);
+}
+.write-feedback.bad {
+  color: var(--bad);
+}
+
+.day-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.day-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.day-progress-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  width: 48px;
+  flex-shrink: 0;
+}
+.day-progress-pct {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.pbar-o.small {
+  height: 6px;
+  margin-top: 0;
 }
 
 h2 {
