@@ -1,5 +1,7 @@
 (function () {
   var STORAGE_KEY = 'vocab-progress-v1';
+  var CUSTOM_WORDS_KEY = 'vocab-custom-words-v1';
+  var CUSTOM_CATEGORIES_KEY = 'vocab-custom-categories-v1';
   var TOTAL_DAYS = 30;
 
   function loadProgress() {
@@ -39,6 +41,35 @@
     saveProgress();
   }
 
+  function loadCustomWords() {
+    try {
+      var raw = localStorage.getItem(CUSTOM_WORDS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveCustomWords() {
+    try {
+      localStorage.setItem(CUSTOM_WORDS_KEY, JSON.stringify(state.customWords));
+    } catch (e) {}
+  }
+  function loadCustomCategories() {
+    try {
+      var raw = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function saveCustomCategories() {
+    try {
+      localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(state.customCategories));
+    } catch (e) {}
+  }
+
   function shuffle(arr) {
     var a = arr.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -57,11 +88,26 @@
   function normalizeAnswer(s) {
     return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
   }
+  function genId() {
+    return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function todayKey() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  function formatDateLabel(key) {
+    return key.split('-').join('.');
+  }
 
   var state = {
     day: 'all',
     tab: 'cards',
     progress: loadProgress(),
+    customWords: loadCustomWords(),
+    customCategories: loadCustomCategories(),
     cardFilter: 'all',
     cardDeck: [],
     cardIndex: 0,
@@ -71,10 +117,139 @@
     wordQuery: '',
     wordStatus: 'all',
     confirmingReset: false,
+    manage: {
+      newEn: '',
+      newKo: '',
+      newExample: '',
+      bulkText: '',
+      addingCategory: false,
+      newCategoryName: '',
+      renamingCategoryId: null,
+      renameValue: '',
+      confirmingDeleteCategoryId: null,
+      collapsed: {},
+    },
   };
+
+  function findCategory(id) {
+    for (var i = 0; i < state.customCategories.length; i++) {
+      if (state.customCategories[i].id === id) return state.customCategories[i];
+    }
+    return null;
+  }
+
+  function ensureDateCategory(dateKey) {
+    var existing = findCategory(dateKey);
+    if (existing) return existing.id;
+    state.customCategories.push({ id: dateKey, name: formatDateLabel(dateKey), createdAt: Date.now() });
+    saveCustomCategories();
+    return dateKey;
+  }
+
+  function addCustomWord(en, ko, example) {
+    en = (en || '').trim();
+    ko = (ko || '').trim();
+    example = (example || '').trim();
+    if (!en || !ko) return false;
+    var categoryId = ensureDateCategory(todayKey());
+    state.customWords.push({ id: genId(), en: en, ko: ko, example: example, categoryId: categoryId, createdAt: Date.now() });
+    saveCustomWords();
+    return true;
+  }
+
+  function addCustomWordsBulk(text) {
+    var lines = (text || '').split('\n');
+    var added = 0;
+    var categoryId = ensureDateCategory(todayKey());
+    lines.forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var parts = line.split(/\s*-\s*|\t/);
+      if (parts.length >= 2) {
+        var en = parts[0].trim();
+        var ko = parts[1].trim();
+        var example = parts.length > 2 ? parts.slice(2).join(' - ').trim() : '';
+        if (en && ko) {
+          state.customWords.push({ id: genId(), en: en, ko: ko, example: example, categoryId: categoryId, createdAt: Date.now() });
+          added++;
+        }
+      }
+    });
+    if (added > 0) saveCustomWords();
+    return added;
+  }
+
+  function moveWordToCategory(wordId, categoryId) {
+    var w = state.customWords.filter(function (x) {
+      return x.id === wordId;
+    })[0];
+    if (!w) return;
+    w.categoryId = categoryId;
+    saveCustomWords();
+  }
+
+  function renameCategory(categoryId, newName) {
+    var cat = findCategory(categoryId);
+    if (!cat) return;
+    var trimmed = (newName || '').trim();
+    if (!trimmed) return;
+    cat.name = trimmed;
+    saveCustomCategories();
+  }
+
+  function createCategory(name) {
+    var trimmed = (name || '').trim();
+    if (!trimmed) return null;
+    var cat = { id: genId(), name: trimmed, createdAt: Date.now() };
+    state.customCategories.push(cat);
+    saveCustomCategories();
+    return cat.id;
+  }
+
+  function deleteCategory(categoryId) {
+    var idsToRemove = state.customWords
+      .filter(function (w) {
+        return w.categoryId === categoryId;
+      })
+      .map(function (w) {
+        return w.id;
+      });
+    state.customWords = state.customWords.filter(function (w) {
+      return w.categoryId !== categoryId;
+    });
+    state.customCategories = state.customCategories.filter(function (c) {
+      return c.id !== categoryId;
+    });
+    idsToRemove.forEach(function (id) {
+      delete state.progress[id];
+    });
+    saveCustomWords();
+    saveCustomCategories();
+    saveProgress();
+    if (state.day === 'custom-' + categoryId) {
+      state.day = 'all';
+    }
+    buildDeck();
+  }
+
+  function deleteCustomWord(id) {
+    state.customWords = state.customWords.filter(function (w) {
+      return w.id !== id;
+    });
+    delete state.progress[id];
+    saveCustomWords();
+    saveProgress();
+  }
 
   function getPool() {
     if (state.day === 'all') return WORDS;
+    if (state.day === 'custom-all') return state.customWords;
+    if (typeof state.day === 'string' && state.day.indexOf('custom-') === 0) {
+      var catId = state.day.slice('custom-'.length);
+      return state.customWords.filter(function (w) {
+        return w.categoryId === catId;
+      });
+    }
     return WORDS.filter(function (w) {
       return w.day === state.day;
     });
@@ -95,22 +270,47 @@
 
   function renderDaySelect() {
     var sel = document.getElementById('day-select');
-    if (!sel.dataset.built) {
-      var html = '<option value="all">전체 (Day 1~30)</option>';
-      for (var d = 1; d <= TOTAL_DAYS; d++) {
-        html += '<option value="' + d + '">Day ' + d + '</option>';
-      }
-      sel.innerHTML = html;
-      sel.dataset.built = '1';
+    var html = '<optgroup label="TOEIC 800~900">';
+    html += '<option value="all">전체 (Day 1~30)</option>';
+    for (var d = 1; d <= TOTAL_DAYS; d++) {
+      html += '<option value="' + d + '">Day ' + d + '</option>';
+    }
+    html += '</optgroup>';
+    if (state.customCategories.length > 0) {
+      html += '<optgroup label="내 단어장">';
+      html += '<option value="custom-all">내 단어 전체 (' + state.customWords.length + ')</option>';
+      var sortedCats = state.customCategories.slice().sort(function (a, b) {
+        return b.createdAt - a.createdAt;
+      });
+      sortedCats.forEach(function (cat) {
+        var count = state.customWords.filter(function (w) {
+          return w.categoryId === cat.id;
+        }).length;
+        html += '<option value="custom-' + cat.id + '">' + esc(cat.name) + ' (' + count + ')</option>';
+      });
+      html += '</optgroup>';
+    }
+    sel.innerHTML = html;
+    sel.value = String(state.day);
+    if (sel.value !== String(state.day)) {
+      state.day = 'all';
+      sel.value = 'all';
+    }
+    if (!sel.dataset.bound) {
+      sel.dataset.bound = '1';
       sel.addEventListener('change', function (e) {
-        state.day = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+        var v = e.target.value;
+        if (v === 'all' || v === 'custom-all' || v.indexOf('custom-') === 0) {
+          state.day = v;
+        } else {
+          state.day = parseInt(v, 10);
+        }
         buildDeck();
         state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
         state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         render();
       });
     }
-    sel.value = String(state.day);
   }
 
   var TABS = [
@@ -118,6 +318,7 @@
     { key: 'quiz', label: '📝 퀴즈' },
     { key: 'write', label: '✍️ 쓰기' },
     { key: 'words', label: '📚 단어장' },
+    { key: 'manage', label: '🗂️ 내 단어장' },
     { key: 'stats', label: '📊 통계' },
   ];
 
@@ -149,7 +350,9 @@
   }
 
   function dayBadge(w) {
-    return 'Day ' + w.day;
+    if (w.day !== undefined) return 'Day ' + w.day;
+    var cat = findCategory(w.categoryId);
+    return cat ? cat.name : '내 단어';
   }
 
   function renderCards() {
@@ -207,7 +410,7 @@
         esc(w.ko) +
         '</h3>' +
         '<p class="example">' +
-        esc(w.example) +
+        esc(w.example || '') +
         '</p>' +
         '</div>' +
         '</div>' +
@@ -281,9 +484,11 @@
   function quizSetupCounts() {
     var poolSize = getPool().length;
     var options = [10, 20, 50];
-    return options.filter(function (n) {
-      return n <= poolSize;
-    }).concat([poolSize]);
+    return options
+      .filter(function (n) {
+        return n <= poolSize;
+      })
+      .concat([poolSize]);
   }
 
   function renderQuiz() {
@@ -291,16 +496,25 @@
     var q = state.quiz;
 
     if (q.stage === 'setup') {
+      var poolSize = getPool().length;
+      if (poolSize < 4) {
+        panel.innerHTML =
+          '<h2>퀴즈 시작하기</h2>' +
+          '<div class="empty"><p>퀴즈를 풀려면 이 범위에 단어가 최소 4개 필요해요. (현재 ' +
+          poolSize +
+          '개)</p></div>';
+        return;
+      }
       var counts = quizSetupCounts();
       panel.innerHTML =
         '<h2>퀴즈 시작하기</h2>' +
         '<p class="hint" style="margin-bottom:16px;">몇 문제를 풀어볼까요? (' +
-        getPool().length +
+        poolSize +
         '개 단어 중에서 출제)</p>' +
         '<div class="setup-row">' +
         counts
           .map(function (n) {
-            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === getPool().length ? '전체' : n + '문제') + '</button>';
+            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === poolSize ? '전체' : n + '문제') + '</button>';
           })
           .join('') +
         '</div>';
@@ -409,9 +623,11 @@
   function writeSetupCounts() {
     var poolSize = getPool().length;
     var options = [10, 20, 50];
-    return options.filter(function (n) {
-      return n <= poolSize;
-    }).concat([poolSize]);
+    return options
+      .filter(function (n) {
+        return n <= poolSize;
+      })
+      .concat([poolSize]);
   }
 
   function renderWrite() {
@@ -419,16 +635,21 @@
     var w = state.write;
 
     if (w.stage === 'setup') {
+      var poolSize = getPool().length;
+      if (poolSize < 1) {
+        panel.innerHTML = '<h2>스펠링 쓰기 연습</h2><div class="empty"><p>이 범위에는 아직 단어가 없어요.</p></div>';
+        return;
+      }
       var counts = writeSetupCounts();
       panel.innerHTML =
         '<h2>스펠링 쓰기 연습</h2>' +
         '<p class="hint" style="margin-bottom:16px;">뜻을 보고 영단어 스펠링을 입력하세요 (' +
-        getPool().length +
+        poolSize +
         '개 단어 중에서 출제)</p>' +
         '<div class="setup-row">' +
         counts
           .map(function (n) {
-            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === getPool().length ? '전체' : n + '문제') + '</button>';
+            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === poolSize ? '전체' : n + '문제') + '</button>';
           })
           .join('') +
         '</div>';
@@ -668,6 +889,343 @@
     }
   }
 
+  function renderManage() {
+    var panel = document.getElementById('panel');
+    var m = state.manage;
+
+    var sortedCats = state.customCategories.slice().sort(function (a, b) {
+      return b.createdAt - a.createdAt;
+    });
+
+    var addCategoryHtml = m.addingCategory
+      ? '<div class="inline-form">' +
+        '<input type="text" id="new-category-input" class="search" placeholder="카테고리 이름" value="' +
+        esc(m.newCategoryName) +
+        '" />' +
+        '<div class="setup-row">' +
+        '<button class="btn btn-primary" id="save-category-btn">만들기</button>' +
+        '<button class="btn btn-bad" id="cancel-category-btn">취소</button>' +
+        '</div>' +
+        '</div>'
+      : '<button class="btn-small-primary" id="add-category-btn">+ 새 카테고리</button>';
+
+    var categoriesHtml;
+    if (sortedCats.length === 0) {
+      categoriesHtml = '<p class="hint">아직 카테고리가 없어요. 단어를 추가하면 오늘 날짜로 자동 생성돼요.</p>';
+    } else {
+      categoriesHtml = sortedCats
+        .map(function (cat) {
+          var wordsInCat = state.customWords.filter(function (w) {
+            return w.categoryId === cat.id;
+          });
+          var collapsed = !!m.collapsed[cat.id];
+
+          var headHtml;
+          if (m.renamingCategoryId === cat.id) {
+            headHtml =
+              '<div class="cat-rename-row">' +
+              '<input type="text" id="rename-input" class="search" value="' +
+              esc(m.renameValue) +
+              '" />' +
+              '<button class="btn btn-primary btn-small-inline" id="save-rename-btn">저장</button>' +
+              '<button class="btn btn-bad btn-small-inline" id="cancel-rename-btn">취소</button>' +
+              '</div>';
+          } else {
+            headHtml =
+              '<div class="cat-head" data-toggle-cat="' +
+              cat.id +
+              '">' +
+              '<span class="cat-title">' +
+              esc(cat.name) +
+              '</span>' +
+              '<span class="cat-count">' +
+              wordsInCat.length +
+              '개</span>' +
+              '<span class="cat-caret">' +
+              (collapsed ? '▸' : '▾') +
+              '</span>' +
+              '</div>';
+          }
+
+          var actionsHtml;
+          if (m.confirmingDeleteCategoryId === cat.id) {
+            actionsHtml =
+              '<div class="reset-confirm">' +
+              '<span>\'' +
+              esc(cat.name) +
+              "' 카테고리와 단어 " +
+              wordsInCat.length +
+              '개를 모두 삭제할까요?</span>' +
+              '<div class="reset-confirm-actions">' +
+              '<button class="btn btn-bad" id="confirm-delete-cat-btn">삭제</button>' +
+              '<button class="btn btn-primary" id="cancel-delete-cat-btn">취소</button>' +
+              '</div>' +
+              '</div>';
+          } else if (m.renamingCategoryId !== cat.id) {
+            actionsHtml =
+              '<div class="cat-actions">' +
+              '<button class="btn-tiny" data-study-cat="' +
+              cat.id +
+              '">이 묶음 학습하기</button>' +
+              '<button class="btn-tiny" data-rename-cat="' +
+              cat.id +
+              '">이름 바꾸기</button>' +
+              '<button class="btn-tiny danger" data-delete-cat="' +
+              cat.id +
+              '">삭제</button>' +
+              '</div>';
+          } else {
+            actionsHtml = '';
+          }
+
+          var bodyHtml = '';
+          if (!collapsed && m.renamingCategoryId !== cat.id) {
+            if (wordsInCat.length === 0) {
+              bodyHtml = '<div class="cat-body"><p class="hint">아직 단어가 없어요.</p></div>';
+            } else {
+              var categoryOptions = sortedCats
+                .map(function (c2) {
+                  return '<option value="' + c2.id + '">' + esc(c2.name) + '</option>';
+                })
+                .join('');
+              bodyHtml =
+                '<div class="cat-body">' +
+                wordsInCat
+                  .map(function (w) {
+                    return (
+                      '<div class="cat-word-row">' +
+                      '<div class="cat-word-main"><b>' +
+                      esc(w.en) +
+                      '</b><span class="cat-word-ko">' +
+                      esc(w.ko) +
+                      '</span></div>' +
+                      '<select class="cat-move-select" data-move-word="' +
+                      w.id +
+                      '">' +
+                      categoryOptions +
+                      '</select>' +
+                      '<button class="del" data-delete-word="' +
+                      w.id +
+                      '">삭제</button>' +
+                      '</div>'
+                    );
+                  })
+                  .join('') +
+                '</div>';
+            }
+          }
+
+          return '<div class="cat-group">' + headHtml + actionsHtml + bodyHtml + '</div>';
+        })
+        .join('');
+    }
+
+    panel.innerHTML =
+      '<h2>내 단어장</h2>' +
+      '<p class="hint" style="margin-bottom:16px;">직접 단어를 추가해보세요. 추가한 날짜별로 자동 정리되고, 카테고리를 만들어 원하는 대로 묶을 수도 있어요.</p>' +
+      '<div class="manage-card">' +
+      '<h3>단어 추가</h3>' +
+      '<div class="manage-row2">' +
+      '<input type="text" id="new-en" class="search" placeholder="영단어" value="' +
+      esc(m.newEn) +
+      '" />' +
+      '<input type="text" id="new-ko" class="search" placeholder="뜻" value="' +
+      esc(m.newKo) +
+      '" />' +
+      '</div>' +
+      '<input type="text" id="new-example" class="search full-width" placeholder="예문 (선택)" value="' +
+      esc(m.newExample) +
+      '" />' +
+      '<button class="btn btn-primary full-width" id="add-word-btn">추가</button>' +
+      '<p class="hint" style="margin-top:8px;">오늘(' +
+      formatDateLabel(todayKey()) +
+      ') 날짜 묶음으로 자동 분류돼요.</p>' +
+      '</div>' +
+      '<div class="manage-card">' +
+      '<h3>여러 단어 한 번에 추가</h3>' +
+      '<textarea id="bulk-input" class="bulk-textarea" placeholder="한 줄에 하나씩, &quot;영단어 - 뜻&quot; 형식으로 입력하세요.\n예) aircraft - 항공기">' +
+      esc(m.bulkText) +
+      '</textarea>' +
+      '<div class="setup-row" style="margin-top:8px;">' +
+      '<button class="btn btn-primary" id="add-bulk-btn">목록에 반영</button>' +
+      '<button class="btn btn-bad" id="clear-bulk-btn">지우기</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="manage-card">' +
+      '<div class="manage-card-head"><h3>카테고리</h3>' +
+      addCategoryHtml +
+      '</div>' +
+      categoriesHtml +
+      '</div>';
+
+    document.getElementById('new-en').addEventListener('input', function (e) {
+      m.newEn = e.target.value;
+    });
+    document.getElementById('new-ko').addEventListener('input', function (e) {
+      m.newKo = e.target.value;
+    });
+    document.getElementById('new-example').addEventListener('input', function (e) {
+      m.newExample = e.target.value;
+    });
+    function submitNewWord() {
+      if (addCustomWord(m.newEn, m.newKo, m.newExample)) {
+        m.newEn = '';
+        m.newKo = '';
+        m.newExample = '';
+        buildDeck();
+        render();
+      }
+    }
+    document.getElementById('add-word-btn').addEventListener('click', submitNewWord);
+    document.getElementById('new-en').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitNewWord();
+    });
+    document.getElementById('new-ko').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitNewWord();
+    });
+
+    var bulkInput = document.getElementById('bulk-input');
+    bulkInput.addEventListener('input', function (e) {
+      m.bulkText = e.target.value;
+    });
+    document.getElementById('add-bulk-btn').addEventListener('click', function () {
+      var added = addCustomWordsBulk(m.bulkText);
+      if (added > 0) {
+        m.bulkText = '';
+        buildDeck();
+      }
+      render();
+    });
+    document.getElementById('clear-bulk-btn').addEventListener('click', function () {
+      m.bulkText = '';
+      render();
+    });
+
+    if (m.addingCategory) {
+      var catInput = document.getElementById('new-category-input');
+      catInput.focus();
+      catInput.addEventListener('input', function (e) {
+        m.newCategoryName = e.target.value;
+      });
+      catInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') saveNewCategory();
+      });
+      document.getElementById('save-category-btn').addEventListener('click', saveNewCategory);
+      document.getElementById('cancel-category-btn').addEventListener('click', function () {
+        m.addingCategory = false;
+        m.newCategoryName = '';
+        render();
+      });
+    } else {
+      document.getElementById('add-category-btn').addEventListener('click', function () {
+        m.addingCategory = true;
+        render();
+      });
+    }
+    function saveNewCategory() {
+      var id = createCategory(m.newCategoryName);
+      if (id) {
+        m.addingCategory = false;
+        m.newCategoryName = '';
+        render();
+      }
+    }
+
+    if (m.renamingCategoryId) {
+      var renameInput = document.getElementById('rename-input');
+      if (renameInput) {
+        renameInput.focus();
+        renameInput.addEventListener('input', function (e) {
+          m.renameValue = e.target.value;
+        });
+        renameInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') saveRename();
+        });
+        document.getElementById('save-rename-btn').addEventListener('click', saveRename);
+        document.getElementById('cancel-rename-btn').addEventListener('click', function () {
+          m.renamingCategoryId = null;
+          render();
+        });
+      }
+    }
+    function saveRename() {
+      renameCategory(m.renamingCategoryId, m.renameValue);
+      m.renamingCategoryId = null;
+      render();
+    }
+
+    if (m.confirmingDeleteCategoryId) {
+      var confirmBtn = document.getElementById('confirm-delete-cat-btn');
+      var cancelBtn = document.getElementById('cancel-delete-cat-btn');
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+          deleteCategory(m.confirmingDeleteCategoryId);
+          m.confirmingDeleteCategoryId = null;
+          render();
+        });
+      }
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+          m.confirmingDeleteCategoryId = null;
+          render();
+        });
+      }
+    }
+
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-toggle-cat]'), function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-toggle-cat');
+        m.collapsed[id] = !m.collapsed[id];
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-study-cat]'), function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var id = el.getAttribute('data-study-cat');
+        state.day = 'custom-' + id;
+        state.tab = 'cards';
+        buildDeck();
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-rename-cat]'), function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var id = el.getAttribute('data-rename-cat');
+        var cat = findCategory(id);
+        m.renamingCategoryId = id;
+        m.renameValue = cat ? cat.name : '';
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-delete-cat]'), function (el) {
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        m.confirmingDeleteCategoryId = el.getAttribute('data-delete-cat');
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('select.cat-move-select'), function (sel) {
+      var wordId = sel.getAttribute('data-move-word');
+      var word = state.customWords.filter(function (w) {
+        return w.id === wordId;
+      })[0];
+      if (word) sel.value = word.categoryId;
+      sel.addEventListener('change', function (e) {
+        moveWordToCategory(wordId, e.target.value);
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-delete-word]'), function (el) {
+      el.addEventListener('click', function () {
+        deleteCustomWord(el.getAttribute('data-delete-word'));
+        buildDeck();
+        render();
+      });
+    });
+  }
+
   function renderStats() {
     var panel = document.getElementById('panel');
     var known = 0,
@@ -710,6 +1268,48 @@
         '%</span></div>';
     }
 
+    var customStatsHtml = '';
+    if (state.customWords.length > 0) {
+      var customKnown = state.customWords.filter(function (w) {
+        return getEntry(w.id).status === 'known';
+      }).length;
+      var catRows = state.customCategories
+        .slice()
+        .sort(function (a, b) {
+          return b.createdAt - a.createdAt;
+        })
+        .map(function (cat) {
+          var catWords = state.customWords.filter(function (w) {
+            return w.categoryId === cat.id;
+          });
+          if (catWords.length === 0) return '';
+          var catKnown = catWords.filter(function (w) {
+            return getEntry(w.id).status === 'known';
+          }).length;
+          var catPct = Math.round((catKnown / catWords.length) * 100);
+          return (
+            '<div class="day-progress-row"><span class="day-progress-label" style="width:auto;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+            esc(cat.name) +
+            '</span><div class="pbar-o small"><div class="pbar-i" style="width:' +
+            catPct +
+            '%"></div></div><span class="day-progress-pct">' +
+            catPct +
+            '%</span></div>'
+          );
+        })
+        .join('');
+      customStatsHtml =
+        '<div class="quiz-stat"><h3>내 단어장 현황</h3>' +
+        '<p class="hint" style="margin-bottom:8px;">전체 ' +
+        state.customWords.length +
+        '개 중 ' +
+        customKnown +
+        '개 암기완료</p>' +
+        '<div class="day-progress-list">' +
+        catRows +
+        '</div></div>';
+    }
+
     panel.innerHTML =
       '<h2>학습 통계</h2>' +
       '<div class="stat-grid">' +
@@ -737,17 +1337,36 @@
       '</p></div>' +
       '<div class="quiz-stat"><h3>Day별 암기 완료율</h3><div class="day-progress-list">' +
       dayRows +
-      '</div></div>';
+      '</div></div>' +
+      customStatsHtml;
   }
 
   function render() {
+    var active = document.activeElement;
+    var activeId = active && active.id;
+    var selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+    var selEnd = active && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
+
     renderDaySelect();
     renderTabs();
     if (state.tab === 'cards') renderCards();
     else if (state.tab === 'quiz') renderQuiz();
     else if (state.tab === 'write') renderWrite();
     else if (state.tab === 'words') renderWords();
+    else if (state.tab === 'manage') renderManage();
     else if (state.tab === 'stats') renderStats();
+
+    if (activeId) {
+      var el = document.getElementById(activeId);
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+        el.focus();
+        if (selStart !== null && el.setSelectionRange) {
+          try {
+            el.setSelectionRange(selStart, selEnd);
+          } catch (e) {}
+        }
+      }
+    }
   }
 
   render();
