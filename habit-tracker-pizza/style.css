@@ -3,9 +3,6 @@
   --crust-dark: #c98a34;
   --dough: #f3d9a4;
   --dough-line: #e0bd7c;
-  --box-kraft: #c88a4f;
-  --box-kraft-dark: #a86e39;
-  --box-kraft-light: #dba86a;
   --ink: #b23b2e;
   --ink-dark: #7c281f;
   --bg: #fff6e9;
@@ -88,8 +85,10 @@ body {
 
 .stage-inner {
   position: relative;
-  width: 280px;
-  height: 280px;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  margin: 0 auto;
 }
 
 .pizza-wrap {
@@ -104,8 +103,8 @@ body {
 
 .pizza-plate {
   position: relative;
-  width: 260px;
-  height: 260px;
+  width: 72%;
+  height: 72%;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%, #fff 0 60%, #fdf3e2 100%);
   box-shadow:
@@ -129,7 +128,7 @@ body {
 .slice-img {
   position: absolute;
   inset: 0;
-  background-size: 260px 260px;
+  background-size: 100% 100%;
   background-position: 0 0;
   background-repeat: no-repeat;
   opacity: 0;
@@ -201,124 +200,48 @@ body {
   50% { box-shadow: 0 0 0 12px #fff1cf, 0 0 40px 6px rgba(232, 102, 63, 0.55), 0 14px 28px rgba(120,74,24,0.22); }
 }
 
-.pizza-wrap.boxing {
-  transform: scale(0.28) translateY(70px);
-  opacity: 0;
-}
+/* ---------- Celebration sparkles ---------- */
 
-/* ---------- Box ---------- */
-
-.box-wrap {
+.sparkle-layer {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.5s ease;
+  z-index: 6;
 }
 
-.box-wrap.visible {
+.sparkle-layer.show {
   opacity: 1;
-  pointer-events: auto;
 }
 
-.box {
-  position: relative;
-  width: 230px;
-  height: 200px;
-}
-
-.box-bottom {
+.sparkle {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 150px;
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--box-kraft-light) 0%, var(--box-kraft) 55%, var(--box-kraft-dark) 100%);
-  box-shadow: 0 16px 26px rgba(120, 74, 24, 0.28);
+  transform: translate(-50%, -50%);
+  animation: sparkle-twinkle 2.6s ease-in-out infinite;
+  animation-play-state: paused;
+  filter: drop-shadow(0 2px 3px rgba(120, 74, 24, 0.12));
 }
 
-.box-bottom-inner {
-  position: absolute;
-  inset: 10px 10px 10px 10px;
-  border: 2px dashed rgba(255, 255, 255, 0.35);
-  border-radius: 6px;
+.sparkle-layer.show .sparkle {
+  animation-play-state: running;
 }
 
-.box-lid {
-  position: absolute;
-  top: 0;
-  left: -6px;
-  right: -6px;
-  height: 90px;
-  transform: translateY(-120px);
-  transition: transform 0.65s cubic-bezier(.2,.9,.35,1.25);
-}
-
-.box-lid.closed {
-  transform: translateY(0);
-}
-
-.box-lid-top {
-  position: relative;
+.sparkle svg {
+  display: block;
   width: 100%;
   height: 100%;
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--box-kraft-light) 0%, var(--box-kraft) 60%, var(--box-kraft-dark) 100%);
-  box-shadow: 0 10px 16px rgba(120, 74, 24, 0.25), inset 0 -4px 0 rgba(0,0,0,0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* ---------- Stamp ---------- */
-
-.stamp {
-  width: 92px;
-  height: 92px;
-  opacity: 0;
-  transform: scale(2.6) rotate(-32deg) translateY(-40px);
-  transition: none;
-}
-
-.stamp.stamping {
-  transition: transform 0.55s cubic-bezier(.34,1.9,.4,1), opacity 0.25s ease;
-  transform: scale(1) rotate(-10deg) translateY(0);
-  opacity: 0.94;
-}
-
-.stamp-svg { width: 100%; height: 100%; }
-
-.stamp-ring-outer,
-.stamp-ring-inner {
-  fill: none;
-  stroke: var(--ink);
-  mix-blend-mode: multiply;
-}
-.stamp-ring-outer { stroke-width: 3.5; }
-.stamp-ring-inner { stroke-width: 2; }
-
-.stamp-text-top,
-.stamp-text-bottom {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  font-weight: 700;
-  fill: var(--ink);
-  text-anchor: middle;
-  letter-spacing: 1px;
-  mix-blend-mode: multiply;
-}
-
-.stamp-text-date {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 15px;
-  font-weight: 700;
-  fill: var(--ink);
-  text-anchor: middle;
-  mix-blend-mode: multiply;
+@keyframes sparkle-twinkle {
+  0%, 100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.82) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 5px)) scale(1.14) rotate(10deg);
+  }
 }
 
 .complete-msg {
@@ -556,42 +479,28 @@ body {
   color: var(--muted);
 }
 
-.history-box {
+.history-chip {
   flex: 0 0 auto;
-  width: 78px;
-  height: 66px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--box-kraft-light) 0%, var(--box-kraft) 60%, var(--box-kraft-dark) 100%);
-  box-shadow: 0 6px 12px rgba(120, 74, 24, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.history-box::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border: 1.5px dashed rgba(255,255,255,0.3);
-  border-radius: 5px;
-}
-
-.history-stamp {
-  width: 40px;
-  height: 40px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  border: 2px solid var(--ink);
+  background: var(--chip-bg, #fdece3);
+  box-shadow: 0 6px 12px rgba(120, 74, 24, 0.15);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
+}
+
+.history-chip .chip-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.history-chip .chip-date {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  color: var(--ink);
-  text-align: center;
-  line-height: 1.1;
-  transform: rotate(-8deg);
-  mix-blend-mode: multiply;
-  z-index: 1;
+  color: var(--ink-dark);
 }
