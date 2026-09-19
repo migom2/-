@@ -129,9 +129,9 @@ body {
 .slice-img {
   position: absolute;
   inset: 0;
-  background-image: url("assets/pizza.jpg");
   background-size: 260px 260px;
   background-position: 0 0;
+  background-repeat: no-repeat;
   opacity: 0;
   transform: scale(1.35) translateY(-30px) rotate(8deg);
   transform-origin: 50% 50%;
