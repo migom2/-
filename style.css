@@ -301,6 +301,18 @@ button.btn {
   background: var(--accent);
   color: #fff;
 }
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink-soft);
+  border-color: var(--line);
+}
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.nav-row {
+  margin-bottom: 10px;
+}
 
 .empty {
   text-align: center;

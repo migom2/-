@@ -102,7 +102,7 @@
     cardDeck: [],
     cardIndex: 0,
     cardFlipped: false,
-    quiz: { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] },
+    quiz: { stage: 'setup', mode: 'en2ko', questions: [], index: 0, selected: null, score: 0, wrong: [] },
     write: { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] },
     wordQuery: '',
     wordStatus: 'all',
@@ -291,7 +291,7 @@
           state.day = parseInt(v, 10);
         }
         buildDeck();
-        state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
+        state.quiz = { stage: 'setup', mode: state.quiz.mode, questions: [], index: 0, selected: null, score: 0, wrong: [] };
         state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         render();
       });
@@ -324,7 +324,7 @@
       btn.addEventListener('click', function () {
         state.tab = btn.getAttribute('data-tab');
         if (state.tab === 'quiz') {
-          state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
+          state.quiz = { stage: 'setup', mode: state.quiz.mode, questions: [], index: 0, selected: null, score: 0, wrong: [] };
         }
         if (state.tab === 'write') {
           state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
@@ -368,7 +368,10 @@
     } else if (state.cardIndex >= state.cardDeck.length) {
       body =
         '<div class="empty"><p>🎉 이번 세트를 모두 학습했어요!</p>' +
-        '<button class="btn btn-primary" id="restart-deck" style="flex:none;padding:12px 20px;">다시 섞어서 학습하기</button></div>';
+        '<div class="setup-row">' +
+        '<button class="btn btn-ghost" id="card-prev">◀ 이전</button>' +
+        '<button class="btn btn-primary" id="restart-deck">다시 섞어서 학습하기</button>' +
+        '</div></div>';
     } else {
       var w = state.cardDeck[state.cardIndex];
       body =
@@ -399,6 +402,12 @@
         '</p>' +
         '</div>' +
         '</div>' +
+        '</div>' +
+        '<div class="nav-row setup-row">' +
+        '<button class="btn btn-ghost" id="card-prev" ' +
+        (state.cardIndex === 0 ? 'disabled' : '') +
+        '>◀ 이전</button>' +
+        '<button class="btn btn-ghost" id="card-next">다음 ▶</button>' +
         '</div>' +
         '<div class="answer-row">' +
         '<button class="btn btn-bad" id="ans-no">🙈 몰라요</button>' +
@@ -443,27 +452,70 @@
         buildDeck();
         render();
       });
+    var prevBtn = document.getElementById('card-prev');
+    if (prevBtn)
+      prevBtn.addEventListener('click', function () {
+        if (state.cardIndex > 0) {
+          state.cardIndex--;
+          state.cardFlipped = false;
+          render();
+        }
+      });
+    var nextBtn = document.getElementById('card-next');
+    if (nextBtn)
+      nextBtn.addEventListener('click', function () {
+        if (state.cardIndex < state.cardDeck.length) {
+          state.cardIndex++;
+          state.cardFlipped = false;
+          render();
+        }
+      });
   }
 
-  function buildQuestionsFromWords(words) {
+  function normalizeOptionKey(s) {
+    return String(s).trim().toLowerCase();
+  }
+
+  function pickUniqueDistractors(pool, excludeId, usedKeys, keyFn, count) {
+    var candidates = shuffle(
+      pool.filter(function (w) {
+        return w.id !== excludeId;
+      }),
+    );
+    var result = [];
+    for (var i = 0; i < candidates.length && result.length < count; i++) {
+      var cand = candidates[i];
+      var key = normalizeOptionKey(keyFn(cand));
+      if (usedKeys[key]) continue;
+      usedKeys[key] = true;
+      result.push(keyFn(cand));
+    }
+    return result;
+  }
+
+  function buildQuestionsFromWords(words, mode) {
+    mode = mode === 'ko2en' ? 'ko2en' : 'en2ko';
     var distractorPool = words.length > 4 ? words : WORDS;
+    var keyFn =
+      mode === 'ko2en'
+        ? function (w) {
+            return w.en;
+          }
+        : function (w) {
+            return w.ko;
+          };
     return shuffle(words).map(function (word) {
-      var distractors = shuffle(
-        distractorPool.filter(function (w) {
-          return w.id !== word.id;
-        }),
-      )
-        .slice(0, 3)
-        .map(function (w) {
-          return w.ko;
-        });
-      return { word: word, options: shuffle([word.ko].concat(distractors)) };
+      var answer = keyFn(word);
+      var usedKeys = {};
+      usedKeys[normalizeOptionKey(answer)] = true;
+      var distractors = pickUniqueDistractors(distractorPool, word.id, usedKeys, keyFn, 3);
+      return { word: word, mode: mode, answer: answer, options: shuffle([answer].concat(distractors)) };
     });
   }
 
-  function buildQuestions(count) {
+  function buildQuestions(count, mode) {
     var pool = getPool();
-    return buildQuestionsFromWords(shuffle(pool).slice(0, count));
+    return buildQuestionsFromWords(shuffle(pool).slice(0, count), mode);
   }
 
   function quizSetupCounts() {
@@ -493,6 +545,14 @@
       var counts = quizSetupCounts();
       panel.innerHTML =
         '<h2>퀴즈 시작하기</h2>' +
+        '<div class="setup-row mode-row" style="margin-bottom:14px;">' +
+        '<button class="btn ' +
+        (q.mode === 'ko2en' ? 'btn-ghost' : 'btn-primary') +
+        '" data-mode="en2ko">단어 → 뜻</button>' +
+        '<button class="btn ' +
+        (q.mode === 'ko2en' ? 'btn-primary' : 'btn-ghost') +
+        '" data-mode="ko2en">뜻 → 단어</button>' +
+        '</div>' +
         '<p class="hint" style="margin-bottom:16px;">몇 문제를 풀어볼까요? (' +
         poolSize +
         '개 단어 중에서 출제)</p>' +
@@ -503,10 +563,24 @@
           })
           .join('') +
         '</div>';
+      Array.prototype.forEach.call(panel.querySelectorAll('[data-mode]'), function (btn) {
+        btn.addEventListener('click', function () {
+          q.mode = btn.getAttribute('data-mode');
+          render();
+        });
+      });
       Array.prototype.forEach.call(panel.querySelectorAll('[data-count]'), function (btn) {
         btn.addEventListener('click', function () {
           var count = parseInt(btn.getAttribute('data-count'), 10);
-          state.quiz = { stage: 'playing', questions: buildQuestions(count), index: 0, selected: null, score: 0, wrong: [] };
+          state.quiz = {
+            stage: 'playing',
+            mode: q.mode,
+            questions: buildQuestions(count, q.mode),
+            index: 0,
+            selected: null,
+            score: 0,
+            wrong: [],
+          };
           render();
         });
       });
@@ -541,12 +615,20 @@
       if (retryWrongBtn) {
         retryWrongBtn.addEventListener('click', function () {
           var wrongWords = q.wrong.slice();
-          state.quiz = { stage: 'playing', questions: buildQuestionsFromWords(wrongWords), index: 0, selected: null, score: 0, wrong: [] };
+          state.quiz = {
+            stage: 'playing',
+            mode: q.mode,
+            questions: buildQuestionsFromWords(wrongWords, q.mode),
+            index: 0,
+            selected: null,
+            score: 0,
+            wrong: [],
+          };
           render();
         });
       }
       document.getElementById('retry-all').addEventListener('click', function () {
-        state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
+        state.quiz = { stage: 'setup', mode: q.mode, questions: [], index: 0, selected: null, score: 0, wrong: [] };
         render();
       });
       return;
@@ -554,11 +636,13 @@
 
     var current = q.questions[q.index];
     var isLast = q.index === q.questions.length - 1;
+    var promptText = current.mode === 'ko2en' ? current.word.ko : current.word.en;
+    var promptLabel = current.mode === 'ko2en' ? '알맞은 영단어를 고르세요' : '알맞은 뜻을 고르세요';
     var optsHtml = current.options
       .map(function (opt) {
         var cls = 'option';
         if (q.selected) {
-          if (opt === current.word.ko) cls += ' correct';
+          if (opt === current.answer) cls += ' correct';
           else if (opt === q.selected) cls += ' wrong';
         }
         return '<button class="' + cls + '" data-opt="' + esc(opt) + '" ' + (q.selected ? 'disabled' : '') + '>' + esc(opt) + '</button>';
@@ -571,10 +655,14 @@
       ' / ' +
       q.questions.length +
       '</p>' +
-      '<h2 class="quiz-word">' +
-      esc(current.word.en) +
+      '<h2 class="quiz-word" style="' +
+      (current.mode === 'ko2en' ? 'font-size:24px;' : '') +
+      '">' +
+      esc(promptText) +
       '</h2>' +
-      '<p class="hint" style="text-align:center;">알맞은 뜻을 고르세요</p>' +
+      '<p class="hint" style="text-align:center;">' +
+      promptLabel +
+      '</p>' +
       '<div class="options">' +
       optsHtml +
       '</div>' +
@@ -584,7 +672,7 @@
       Array.prototype.forEach.call(panel.querySelectorAll('[data-opt]'), function (btn) {
         btn.addEventListener('click', function () {
           var opt = btn.getAttribute('data-opt');
-          var isCorrect = opt === current.word.ko;
+          var isCorrect = opt === current.answer;
           q.selected = opt;
           recordResult(current.word.id, isCorrect);
           if (isCorrect) q.score++;
