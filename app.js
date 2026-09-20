@@ -493,6 +493,8 @@
     return result;
   }
 
+  var IDK_OPTION = '모르겠어요';
+
   function buildQuestionsFromWords(words, mode) {
     mode = mode === 'ko2en' ? 'ko2en' : 'en2ko';
     var distractorPool = words.length > 4 ? words : WORDS;
@@ -509,7 +511,8 @@
       var usedKeys = {};
       usedKeys[normalizeOptionKey(answer)] = true;
       var distractors = pickUniqueDistractors(distractorPool, word.id, usedKeys, keyFn, 3);
-      return { word: word, mode: mode, answer: answer, options: shuffle([answer].concat(distractors)) };
+      var options = shuffle([answer].concat(distractors)).concat([IDK_OPTION]);
+      return { word: word, mode: mode, answer: answer, options: options };
     });
   }
 
@@ -641,6 +644,7 @@
     var optsHtml = current.options
       .map(function (opt) {
         var cls = 'option';
+        if (opt === IDK_OPTION) cls += ' option-idk';
         if (q.selected) {
           if (opt === current.answer) cls += ' correct';
           else if (opt === q.selected) cls += ' wrong';

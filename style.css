@@ -364,6 +364,11 @@ button.btn {
   border-color: var(--bad);
   color: var(--bad);
 }
+.option-idk {
+  font-style: italic;
+  color: var(--ink-soft);
+  border-style: dashed;
+}
 
 .score {
   text-align: center;
