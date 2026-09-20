@@ -130,6 +130,7 @@
 
     let listening = false;
     let userStopped = false;
+    let pendingInterim = "";
 
     recognition.onresult = (event) => {
       let interimText = "";
@@ -138,26 +139,43 @@
         const transcript = result[0].transcript;
         if (result.isFinal) {
           splitSpokenTasks(transcript).forEach(addTodo);
+          pendingInterim = "";
           el.interim.textContent = "";
         } else {
           interimText += transcript;
         }
       }
-      if (interimText) el.interim.textContent = interimText;
+      if (interimText) {
+        pendingInterim = interimText;
+        el.interim.textContent = interimText;
+      }
     };
+
+    function commitPendingInterim() {
+      if (pendingInterim.trim()) {
+        splitSpokenTasks(pendingInterim).forEach(addTodo);
+        pendingInterim = "";
+      }
+    }
 
     recognition.onerror = (event) => {
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         el.micHint.textContent = "마이크 권한을 허용해주세요.";
         userStopped = true;
         listening = false;
-        setMicState(false);
+      } else if (event.error !== "no-speech" && event.error !== "aborted") {
+        el.micHint.textContent = `음성 인식 오류가 발생했어요 (${event.error}). 다시 시도해주세요.`;
       }
     };
 
     recognition.onend = () => {
+      commitPendingInterim();
       if (listening && !userStopped) {
-        recognition.start();
+        try {
+          recognition.start();
+        } catch {
+          setMicState(false);
+        }
       } else {
         setMicState(false);
       }
