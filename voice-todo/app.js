@@ -42,6 +42,15 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
   }
 
+  const SPLIT_PATTERN = /(?:,|、|그리고 나서|그리고나서|그리고|또한|또|그 다음에|그다음에|그 다음|그다음|다음으로|;|\n)/g;
+
+  function splitSpokenTasks(text) {
+    return text
+      .split(SPLIT_PATTERN)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   function addTodo(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -128,7 +137,7 @@
         const result = event.results[i];
         const transcript = result[0].transcript;
         if (result.isFinal) {
-          addTodo(transcript);
+          splitSpokenTasks(transcript).forEach(addTodo);
           el.interim.textContent = "";
         } else {
           interimText += transcript;
