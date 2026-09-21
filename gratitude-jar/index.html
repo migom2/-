@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>감사 일기장</title>
-    <meta name="description" content="감사한 일을 한 줄씩 적으면 종이별이 되어 유리병에 쌓이는 감사 일기장." />
+    <meta name="description" content="긴 색종이에 감사한 일을 적으면 입체 종이별로 접혀 유리병에 쌓이는 감사 일기장." />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫙</text></svg>" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&family=Gaegu:wght@400;700&display=swap" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
@@ -18,14 +18,18 @@
 
       <section class="jar-card">
         <div class="jar" id="jar">
-          <div class="jar-lid"></div>
+          <div class="jar-ground-shadow"></div>
+          <div class="jar-lid">
+            <div class="jar-lid-top"></div>
+          </div>
           <div class="jar-neck"></div>
           <div class="jar-body">
             <div class="jar-stars" id="jar-stars"></div>
-            <div class="jar-shine"></div>
+            <div class="jar-shine jar-shine-1"></div>
+            <div class="jar-shine jar-shine-2"></div>
           </div>
         </div>
-        <p class="jar-hint">별을 하나씩 접어 감사한 마음을 채워보세요</p>
+        <p class="jar-hint">색종이에 감사를 적어 별을 접어보세요</p>
       </section>
 
       <div class="action-row">
@@ -41,15 +45,21 @@
 
         <div class="stage stage-write">
           <h2>오늘 감사한 일을 적어보세요</h2>
-          <p class="modal-desc">한 줄씩 적으면 종이별이 되어 유리병에 담겨요.</p>
-          <textarea
-            id="entry-input"
-            class="entry-input"
-            rows="3"
-            maxlength="120"
-            placeholder="예: 오늘 점심에 먹은 김치찌개가 맛있었다"
-          ></textarea>
-          <ul class="pending-list" id="pending-list"></ul>
+          <p class="modal-desc">긴 색종이에 한 줄씩 적으면 종이별로 접혀 유리병에 담겨요.</p>
+
+          <div class="strip-input-wrap">
+            <span class="strip-glyph">✱</span>
+            <textarea
+              id="entry-input"
+              class="entry-input"
+              rows="1"
+              maxlength="120"
+              placeholder="예: 오늘 점심에 먹은 김치찌개가 맛있었다"
+            ></textarea>
+          </div>
+
+          <ul class="strip-list" id="pending-list"></ul>
+
           <div class="modal-btn-row">
             <button id="add-more-btn" class="secondary-btn" type="button">➕ 추가로 적기</button>
             <button id="done-btn" class="secondary-btn" type="button">완료</button>
@@ -58,8 +68,8 @@
 
         <div class="stage stage-review">
           <h2>별이 될 준비가 됐어요</h2>
-          <p class="modal-desc"><span id="review-count">0</span>개의 감사를 유리병에 담을게요.</p>
-          <ul class="review-list" id="review-list"></ul>
+          <p class="modal-desc"><span id="review-count">0</span>개의 색종이가 별로 접힐 거예요.</p>
+          <ul class="strip-list" id="review-list"></ul>
           <div class="modal-btn-row">
             <button id="back-to-write-btn" class="secondary-btn" type="button">✏️ 다시 쓰기</button>
             <button id="save-jar-btn" class="primary-btn" type="button">🫙 유리병에 저장하기</button>

@@ -17,15 +17,30 @@
     "#CDECC5",
   ];
 
+  const STAR_POINTS = [
+    [50, 0],
+    [61, 35],
+    [98, 35],
+    [68, 57],
+    [79, 91],
+    [50, 70],
+    [21, 91],
+    [32, 57],
+    [2, 35],
+    [39, 35],
+  ];
+
   const el = {
     jarCount: document.getElementById("jar-count"),
     jarStars: document.getElementById("jar-stars"),
+    jarBody: document.querySelector(".jar-body"),
     writeBtn: document.getElementById("write-btn"),
     drawBtn: document.getElementById("draw-btn"),
 
     writeModal: document.getElementById("write-modal"),
     writeCard: document.getElementById("write-card"),
     writeClose: document.getElementById("write-close"),
+    stripInputWrap: document.querySelector(".strip-input-wrap"),
     entryInput: document.getElementById("entry-input"),
     pendingList: document.getElementById("pending-list"),
     addMoreBtn: document.getElementById("add-more-btn"),
@@ -48,6 +63,7 @@
 
   let entries = loadEntries();
   let pending = []; // { text, color } — 아직 유리병에 저장되지 않은 초안
+  let colorCursor = Math.floor(Math.random() * PASTELS.length);
   let currentRevealId = null;
 
   renderJar();
@@ -69,8 +85,10 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   }
 
-  function randomPastel() {
-    return PASTELS[Math.floor(Math.random() * PASTELS.length)];
+  function nextPastel() {
+    const color = PASTELS[colorCursor % PASTELS.length];
+    colorCursor++;
+    return color;
   }
 
   function shuffle(arr) {
@@ -82,22 +100,44 @@
     return a;
   }
 
+  // ---------- shape helpers ----------
+
+  function rectPerimeterPoints(n) {
+    const points = [];
+    const total = 400; // 100 units per side * 4 sides
+    for (let i = 0; i < n; i++) {
+      const d = (i / n) * total;
+      if (d < 100) points.push([d, 0]);
+      else if (d < 200) points.push([100, d - 100]);
+      else if (d < 300) points.push([100 - (d - 200), 100]);
+      else points.push([0, 100 - (d - 300)]);
+    }
+    return points;
+  }
+
+  function toClipPath(points) {
+    return `polygon(${points.map((p) => `${p[0]}% ${p[1]}%`).join(",")})`;
+  }
+
+  const RECT_CLIP = toClipPath(rectPerimeterPoints(STAR_POINTS.length));
+  const STAR_CLIP = toClipPath(STAR_POINTS);
+
   // ---------- jar rendering ----------
 
-  function renderJar() {
+  function renderJar(settleNewest) {
     el.jarStars.innerHTML = "";
     const count = entries.length;
     if (count === 0) return;
 
-    const containerHeight = el.jarStars.clientHeight || 240;
+    const containerHeight = el.jarStars.clientHeight || 244;
     const fillRatio = Math.min(count / FILL_CAP, 1);
-    const maxFillPx = Math.max(containerHeight * fillRatio, 26); // 별이 적어도 바닥에 살짝 쌓여 보이도록
+    const maxFillPx = Math.max(containerHeight * fillRatio, 26);
     const toRender = count > FILL_CAP ? shuffle(entries).slice(0, FILL_CAP) : entries;
 
     toRender.forEach((entry) => {
       const star = document.createElement("div");
       star.className = "paper-star";
-      star.style.background = entry.color || randomPastel();
+      star.style.background = entry.color || nextPastel();
       const size = 14 + Math.random() * 10;
       star.style.width = `${size}px`;
       star.style.height = `${size}px`;
@@ -130,6 +170,52 @@
     showToast._t = setTimeout(() => el.toast.classList.remove("show"), 2200);
   }
 
+  // ---------- fold-to-star animation ----------
+
+  function morphRectToStar(srcRect, color, targetRect) {
+    return new Promise((resolve) => {
+      const clone = document.createElement("div");
+      clone.className = "fold-fx";
+      clone.style.left = `${srcRect.left}px`;
+      clone.style.top = `${srcRect.top}px`;
+      clone.style.width = `${srcRect.width}px`;
+      clone.style.height = `${srcRect.height}px`;
+      clone.style.background = color;
+      clone.style.borderRadius = "7px";
+      clone.style.clipPath = RECT_CLIP;
+      clone.style.transform = "rotate(0deg)";
+      document.body.appendChild(clone);
+
+      void clone.offsetWidth; // force reflow so the transition below animates
+
+      requestAnimationFrame(() => {
+        clone.style.transition =
+          "left 0.65s cubic-bezier(.34,1.1,.4,1), top 0.65s cubic-bezier(.34,1.1,.4,1), " +
+          "width 0.65s cubic-bezier(.34,1.1,.4,1), height 0.65s cubic-bezier(.34,1.1,.4,1), " +
+          "clip-path 0.65s ease-in-out, transform 0.65s ease-in-out, border-radius 0.65s ease";
+        clone.style.left = `${targetRect.left}px`;
+        clone.style.top = `${targetRect.top}px`;
+        clone.style.width = `${targetRect.width}px`;
+        clone.style.height = `${targetRect.height}px`;
+        clone.style.borderRadius = "2px";
+        clone.style.clipPath = STAR_CLIP;
+        clone.style.transform = `rotate(${targetRect.rot}deg)`;
+      });
+
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clone.remove();
+        resolve();
+      };
+      clone.addEventListener("transitionend", (e) => {
+        if (e.propertyName === "clip-path") finish();
+      });
+      setTimeout(finish, 800); // safety net in case transitionend doesn't fire
+    });
+  }
+
   // ---------- write modal ----------
 
   function openWriteModal() {
@@ -155,37 +241,51 @@
 
   function addCurrentInputToPending() {
     const text = el.entryInput.value.trim();
-    if (!text) return false;
-    pending.push({ text, color: randomPastel() });
+    if (!text) {
+      el.stripInputWrap.classList.add("shake");
+      setTimeout(() => el.stripInputWrap.classList.remove("shake"), 300);
+      return false;
+    }
+    pending.push({ text, color: nextPastel() });
     el.entryInput.value = "";
     renderPendingList();
     return true;
   }
 
-  function renderPendingList() {
-    el.pendingList.innerHTML = "";
-    pending.forEach((item, index) => {
-      const li = document.createElement("li");
-      li.className = "pending-item";
+  function buildStripItem(item, onRemove) {
+    const li = document.createElement("li");
+    li.className = "strip-item";
+    li.style.background = item.color;
 
-      const dot = document.createElement("span");
-      dot.className = "dot";
-      dot.style.background = item.color;
+    const glyph = document.createElement("span");
+    glyph.className = "strip-glyph";
+    glyph.textContent = "✱";
 
-      const span = document.createElement("span");
-      span.className = "entry-text";
-      span.textContent = item.text;
+    const span = document.createElement("span");
+    span.className = "entry-text";
+    span.textContent = item.text;
 
+    li.append(glyph, span);
+
+    if (onRemove) {
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "remove-btn";
       removeBtn.textContent = "✕";
-      removeBtn.addEventListener("click", () => {
+      removeBtn.addEventListener("click", onRemove);
+      li.appendChild(removeBtn);
+    }
+
+    return li;
+  }
+
+  function renderPendingList() {
+    el.pendingList.innerHTML = "";
+    pending.forEach((item, index) => {
+      const li = buildStripItem(item, () => {
         pending.splice(index, 1);
         renderPendingList();
       });
-
-      li.append(dot, span, removeBtn);
       el.pendingList.appendChild(li);
     });
   }
@@ -194,38 +294,51 @@
     el.reviewCount.textContent = String(pending.length);
     el.reviewList.innerHTML = "";
     pending.forEach((item) => {
-      const li = document.createElement("li");
-      li.className = "review-item";
-
-      const dot = document.createElement("span");
-      dot.className = "dot";
-      dot.style.background = item.color;
-
-      const span = document.createElement("span");
-      span.className = "entry-text";
-      span.textContent = item.text;
-
-      li.append(dot, span);
-      el.reviewList.appendChild(li);
+      el.reviewList.appendChild(buildStripItem(item));
     });
   }
 
   function handleDone() {
-    addCurrentInputToPending();
+    if (el.entryInput.value.trim()) addCurrentInputToPending();
     if (pending.length === 0) {
       el.entryInput.focus();
-      el.entryInput.classList.add("shake");
-      setTimeout(() => el.entryInput.classList.remove("shake"), 300);
       return;
     }
     renderReviewList();
     setStage("review");
   }
 
-  function saveToJar() {
+  async function saveToJar() {
     if (pending.length === 0) return;
+    el.saveJarBtn.disabled = true;
+
+    const stripEls = Array.from(el.reviewList.querySelectorAll(".strip-item"));
+    const srcRects = stripEls.map((elm) => elm.getBoundingClientRect());
+    const savedPending = pending;
+
+    el.writeModal.hidden = true;
+    pending = [];
+
+    const jarRect = el.jarStars.getBoundingClientRect();
+    const animations = srcRects.map((srcRect, i) => {
+      const size = 14 + Math.random() * 10;
+      const left = jarRect.left + 6 + Math.random() * Math.max(jarRect.width - size - 12, 10);
+      const fillPx = Math.max(jarRect.height * Math.min(entries.length / FILL_CAP + 0.15, 1), 40);
+      const top = jarRect.top + jarRect.height - size - Math.random() * Math.min(fillPx, jarRect.height - size - 4);
+      const rot = Math.random() * 360;
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          morphRectToStar(srcRect, savedPending[i].color, { left, top, width: size, height: size, rot }).then(
+            resolve
+          );
+        }, i * 90);
+      });
+    });
+
+    await Promise.all(animations);
+
     const now = Date.now();
-    pending.forEach((item, i) => {
+    savedPending.forEach((item, i) => {
       entries.unshift({
         id: `${now}-${i}-${Math.random().toString(36).slice(2, 8)}`,
         text: item.text,
@@ -235,18 +348,15 @@
     });
     saveEntries();
 
-    const savedCount = pending.length;
-    pending = [];
-    el.writeModal.hidden = true;
-
     renderJar();
     updateCountLabel();
     updateDrawButton();
+    el.saveJarBtn.disabled = false;
 
-    const newStars = Array.from(el.jarStars.querySelectorAll(".paper-star")).slice(0, savedCount);
-    newStars.forEach((star) => star.classList.add("dropping"));
+    const newStars = Array.from(el.jarStars.querySelectorAll(".paper-star")).slice(0, savedPending.length);
+    newStars.forEach((star) => star.classList.add("settling"));
 
-    showToast(`🌟 ${savedCount}개의 별을 유리병에 담았어요`);
+    showToast(`🌟 ${savedPending.length}개의 별을 유리병에 담았어요`);
   }
 
   el.writeBtn.addEventListener("click", openWriteModal);
@@ -261,6 +371,11 @@
       e.preventDefault();
       addCurrentInputToPending();
     }
+  });
+
+  el.entryInput.addEventListener("input", () => {
+    el.entryInput.style.height = "auto";
+    el.entryInput.style.height = `${el.entryInput.scrollHeight}px`;
   });
 
   el.writeModal.addEventListener("click", (e) => {
