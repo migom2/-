@@ -218,9 +218,14 @@
 
   // ---------- write modal ----------
 
+  function resetInputHeight() {
+    el.entryInput.style.height = "auto";
+  }
+
   function openWriteModal() {
     pending = [];
     el.entryInput.value = "";
+    resetInputHeight();
     setStage("write");
     renderPendingList();
     el.writeModal.hidden = false;
@@ -233,6 +238,7 @@
     el.writeModal.hidden = true;
     pending = [];
     el.entryInput.value = "";
+    resetInputHeight();
   }
 
   function setStage(stage) {
@@ -248,6 +254,7 @@
     }
     pending.push({ text, color: nextPastel() });
     el.entryInput.value = "";
+    resetInputHeight();
     renderPendingList();
     return true;
   }
