@@ -24,9 +24,9 @@
           <svg class="jar-svg" viewBox="0 0 240 340" aria-hidden="true">
             <defs>
               <linearGradient id="glass-grad" x1="0%" y1="0%" x2="20%" y2="100%">
-                <stop offset="0%" stop-color="#e9defa" stop-opacity="0.55" />
-                <stop offset="55%" stop-color="#c7aeed" stop-opacity="0.5" />
-                <stop offset="100%" stop-color="#9c7bd1" stop-opacity="0.68" />
+                <stop offset="0%" stop-color="#ede4fb" stop-opacity="0.22" />
+                <stop offset="55%" stop-color="#d5c3f3" stop-opacity="0.2" />
+                <stop offset="100%" stop-color="#b39ce2" stop-opacity="0.34" />
               </linearGradient>
               <linearGradient id="lid-grad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stop-color="#f6effc" />
@@ -38,17 +38,16 @@
               </filter>
             </defs>
 
-            <ellipse class="jar-pool" cx="120" cy="286" rx="68" ry="15" />
+            <ellipse class="jar-pool" cx="120" cy="296" rx="64" ry="16" />
 
             <g filter="url(#jar-wobble)">
               <path
                 class="jar-glass"
                 d="M 76 46
                    C 55 46 42 60 42 100
-                   L 42 288
-                   C 42 300 50 306 62 306
-                   L 178 306
-                   C 190 306 198 300 198 288
+                   L 42 258
+                   C 42 296 64 314 120 314
+                   C 176 314 198 296 198 258
                    L 198 100
                    C 198 60 185 46 164 46
                    Z"
@@ -92,6 +91,7 @@
               maxlength="120"
               placeholder="예: 오늘 점심에 먹은 김치찌개가 맛있었다"
             ></textarea>
+            <span class="strip-date-corner" id="entry-date"></span>
           </div>
 
           <ul class="strip-list" id="pending-list"></ul>

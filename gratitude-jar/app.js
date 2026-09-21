@@ -41,6 +41,7 @@
     writeClose: document.getElementById("write-close"),
     stripInputWrap: document.querySelector(".strip-input-wrap"),
     entryInput: document.getElementById("entry-input"),
+    entryDate: document.getElementById("entry-date"),
     pendingList: document.getElementById("pending-list"),
     addMoreBtn: document.getElementById("add-more-btn"),
     doneBtn: document.getElementById("done-btn"),
@@ -88,6 +89,10 @@
     const color = PASTELS[colorCursor % PASTELS.length];
     colorCursor++;
     return color;
+  }
+
+  function formatShortDate(date) {
+    return `${date.getMonth() + 1}월 ${date.getDate()}일`;
   }
 
   function shuffle(arr) {
@@ -225,6 +230,7 @@
     pending = [];
     el.entryInput.value = "";
     resetInputHeight();
+    el.entryDate.textContent = formatShortDate(new Date());
     setStage("write");
     renderPendingList();
     el.writeModal.hidden = false;
@@ -251,7 +257,7 @@
       setTimeout(() => el.stripInputWrap.classList.remove("shake"), 300);
       return false;
     }
-    pending.push({ text, color: nextPastel() });
+    pending.push({ text, color: nextPastel(), date: formatShortDate(new Date()) });
     el.entryInput.value = "";
     resetInputHeight();
     renderPendingList();
@@ -263,6 +269,9 @@
     li.className = "strip-item";
     li.style.background = item.color;
 
+    const row = document.createElement("div");
+    row.className = "strip-item-row";
+
     const glyph = document.createElement("span");
     glyph.className = "strip-glyph";
     glyph.textContent = "✱";
@@ -271,7 +280,7 @@
     span.className = "entry-text";
     span.textContent = item.text;
 
-    li.append(glyph, span);
+    row.append(glyph, span);
 
     if (onRemove) {
       const removeBtn = document.createElement("button");
@@ -279,8 +288,15 @@
       removeBtn.className = "remove-btn";
       removeBtn.textContent = "✕";
       removeBtn.addEventListener("click", onRemove);
-      li.appendChild(removeBtn);
+      row.appendChild(removeBtn);
     }
+
+    li.appendChild(row);
+
+    const date = document.createElement("span");
+    date.className = "strip-date";
+    date.textContent = item.date || formatShortDate(new Date());
+    li.appendChild(date);
 
     return li;
   }
