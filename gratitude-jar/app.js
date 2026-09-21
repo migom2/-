@@ -33,7 +33,6 @@
   const el = {
     jarCount: document.getElementById("jar-count"),
     jarStars: document.getElementById("jar-stars"),
-    jarLabelText: document.getElementById("jar-label-text"),
     writeBtn: document.getElementById("write-btn"),
     drawBtn: document.getElementById("draw-btn"),
 
@@ -157,7 +156,6 @@
   function updateCountLabel() {
     const count = entries.length;
     el.jarCount.textContent = count === 0 ? "아직 채워진 별이 없어요" : `총 ${count}개의 감사 별이 담겨 있어요`;
-    el.jarLabelText.textContent = String(count);
   }
 
   function updateDrawButton() {
