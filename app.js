@@ -229,9 +229,6 @@
   var WEAK_THRESHOLD = 2;
   var MASTERED_THRESHOLD = 2;
 
-  function allWordsCombined() {
-    return WORDS.concat(state.customWords);
-  }
   function isWeak(entry) {
     return (entry.wrong || 0) >= WEAK_THRESHOLD;
   }
@@ -241,16 +238,6 @@
 
   function getPool() {
     if (state.day === 'all') return WORDS;
-    if (state.day === 'weak') {
-      return allWordsCombined().filter(function (w) {
-        return isWeak(getEntry(w.id));
-      });
-    }
-    if (state.day === 'mastered') {
-      return allWordsCombined().filter(function (w) {
-        return isMastered(getEntry(w.id));
-      });
-    }
     if (state.day === 'custom-all') return state.customWords;
     if (typeof state.day === 'string' && state.day.indexOf('custom-') === 0) {
       var catId = state.day.slice('custom-'.length);
@@ -284,16 +271,6 @@
       html += '<option value="' + d + '">Day ' + d + '</option>';
     }
     html += '</optgroup>';
-    var weakCount = allWordsCombined().filter(function (w) {
-      return isWeak(getEntry(w.id));
-    }).length;
-    var masteredCount = allWordsCombined().filter(function (w) {
-      return isMastered(getEntry(w.id));
-    }).length;
-    html += '<optgroup label="복습">';
-    html += '<option value="weak">🔴 틀린 단어 모음 (' + weakCount + ')</option>';
-    html += '<option value="mastered">🟢 외운 단어 (' + masteredCount + ')</option>';
-    html += '</optgroup>';
     if (state.customCategories.length > 0) {
       html += '<optgroup label="내 단어장">';
       html += '<option value="custom-all">내 단어 전체 (' + state.customWords.length + ')</option>';
@@ -318,7 +295,7 @@
       sel.dataset.bound = '1';
       sel.addEventListener('change', function (e) {
         var v = e.target.value;
-        if (v === 'all' || v === 'weak' || v === 'mastered' || v === 'custom-all' || v.indexOf('custom-') === 0) {
+        if (v === 'all' || v === 'custom-all' || v.indexOf('custom-') === 0) {
           state.day = v;
         } else {
           state.day = parseInt(v, 10);
@@ -528,7 +505,7 @@
 
   var IDK_OPTION = '모르겠어요';
 
-  function buildQuestionsFromWords(words, mode) {
+  function buildQuestionsFromWords(words, mode, preserveOrder) {
     mode = mode === 'ko2en' ? 'ko2en' : 'en2ko';
     var distractorPool = words.length > 4 ? words : WORDS;
     var keyFn =
@@ -539,7 +516,8 @@
         : function (w) {
             return w.ko;
           };
-    return shuffle(words).map(function (word) {
+    var orderedWords = preserveOrder ? words : shuffle(words);
+    return orderedWords.map(function (word) {
       var answer = keyFn(word);
       var usedKeys = {};
       usedKeys[normalizeOptionKey(answer)] = true;
@@ -549,19 +527,28 @@
     });
   }
 
-  function buildQuestions(count, mode) {
-    var pool = getPool();
-    return buildQuestionsFromWords(shuffle(pool).slice(0, count), mode);
+  // Splits a pool into words already mastered (correct >= threshold, excluded
+  // from quiz) vs. the rest, further separating frequently-missed "important"
+  // words so they can be placed at the end of the quiz session.
+  function splitQuizPool(pool) {
+    var mastered = [];
+    var normal = [];
+    var important = [];
+    pool.forEach(function (w) {
+      var entry = getEntry(w.id);
+      if (isMastered(entry)) mastered.push(w);
+      else if (isWeak(entry)) important.push(w);
+      else normal.push(w);
+    });
+    return { mastered: mastered, normal: normal, important: important };
   }
 
-  function quizSetupCounts() {
-    var poolSize = getPool().length;
-    var options = [10, 20, 50];
-    return options
-      .filter(function (n) {
-        return n <= poolSize;
-      })
-      .concat([poolSize]);
+  function buildReviewQuestions(normalWords, importantWords, count, mode) {
+    var selectedImportant = shuffle(importantWords).slice(0, count);
+    var remainingSlots = count - selectedImportant.length;
+    var selectedNormal = shuffle(normalWords).slice(0, Math.max(remainingSlots, 0));
+    var orderedWords = selectedNormal.concat(selectedImportant);
+    return buildQuestionsFromWords(orderedWords, mode, true);
   }
 
   function renderQuiz() {
@@ -569,16 +556,69 @@
     var q = state.quiz;
 
     if (q.stage === 'setup') {
-      var poolSize = getPool().length;
-      if (poolSize < 4) {
-        panel.innerHTML =
-          '<h2>퀴즈 시작하기</h2>' +
-          '<div class="empty"><p>퀴즈를 풀려면 이 범위에 단어가 최소 4개 필요해요. (현재 ' +
-          poolSize +
-          '개)</p></div>';
+      var pool = getPool();
+      if (pool.length === 0) {
+        panel.innerHTML = '<h2>퀴즈 시작하기</h2><div class="empty"><p>이 범위에는 단어가 없어요.</p></div>';
         return;
       }
-      var counts = quizSetupCounts();
+      var split = splitQuizPool(pool);
+      var remaining = split.normal.concat(split.important);
+      var progressHint = '암기완료 ' + split.mastered.length + ' / ' + pool.length;
+
+      if (remaining.length === 0) {
+        panel.innerHTML =
+          '<h2>퀴즈 시작하기</h2>' +
+          '<div class="empty"><p>🎉 이 범위 단어를 모두 암기했어요! (' +
+          split.mastered.length +
+          '/' +
+          pool.length +
+          ')</p>' +
+          '<button class="btn btn-primary" id="review-all-btn" style="flex:none;padding:12px 20px;">전체 다시 복습하기</button></div>';
+        document.getElementById('review-all-btn').addEventListener('click', function () {
+          state.quiz = {
+            stage: 'playing',
+            mode: q.mode,
+            questions: buildQuestionsFromWords(pool, q.mode),
+            index: 0,
+            selected: null,
+            score: 0,
+            wrong: [],
+          };
+          render();
+        });
+        return;
+      }
+
+      if (remaining.length < 4) {
+        panel.innerHTML =
+          '<h2>퀴즈 시작하기</h2>' +
+          '<div class="empty"><p>암기 안 된 단어가 ' +
+          remaining.length +
+          '개뿐이라 퀴즈를 만들 수 없어요. (최소 4개 필요)</p>' +
+          '<p class="hint">' +
+          progressHint +
+          '</p></div>';
+        return;
+      }
+
+      var counts = [10, 20, 50, remaining.length].filter(function (n, idx, arr) {
+        return n <= remaining.length && arr.indexOf(n) === idx;
+      });
+      var importantHtml = '';
+      if (split.important.length > 0) {
+        importantHtml =
+          '<div class="quiz-important"><h3>⭐ 중요한 단어 (2번 이상 틀림) · ' +
+          split.important.length +
+          '개</h3>' +
+          '<ul class="important-list">' +
+          split.important
+            .map(function (w) {
+              return '<li><strong>' + esc(w.en) + '</strong> — ' + esc(w.ko) + '</li>';
+            })
+            .join('') +
+          '</ul></div>';
+      }
+
       panel.innerHTML =
         '<h2>퀴즈 시작하기</h2>' +
         '<div class="setup-row mode-row" style="margin-bottom:14px;">' +
@@ -590,15 +630,20 @@
         '" data-mode="ko2en">뜻 → 단어</button>' +
         '</div>' +
         '<p class="hint" style="margin-bottom:16px;">몇 문제를 풀어볼까요? (' +
-        poolSize +
-        '개 단어 중에서 출제)</p>' +
+        remaining.length +
+        '개 단어 중에서 출제 · ' +
+        progressHint +
+        ')</p>' +
         '<div class="setup-row">' +
         counts
           .map(function (n) {
-            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === poolSize ? '전체' : n + '문제') + '</button>';
+            return (
+              '<button class="btn btn-primary" data-count="' + n + '">' + (n === remaining.length ? '전체' : n + '문제') + '</button>'
+            );
           })
           .join('') +
-        '</div>';
+        '</div>' +
+        importantHtml;
       Array.prototype.forEach.call(panel.querySelectorAll('[data-mode]'), function (btn) {
         btn.addEventListener('click', function () {
           q.mode = btn.getAttribute('data-mode');
@@ -611,7 +656,7 @@
           state.quiz = {
             stage: 'playing',
             mode: q.mode,
-            questions: buildQuestions(count, q.mode),
+            questions: buildReviewQuestions(split.normal, split.important, count, q.mode),
             index: 0,
             selected: null,
             score: 0,

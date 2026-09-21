@@ -403,6 +403,31 @@ button.btn {
   font-size: 13.5px;
 }
 
+.quiz-important {
+  margin-top: 18px;
+}
+.quiz-important h3 {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: 15px;
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+}
+.important-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.important-list li {
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
 .controls-row {
   display: flex;
   flex-wrap: wrap;
