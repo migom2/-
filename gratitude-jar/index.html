@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>감사 일기장</title>
+    <meta name="description" content="감사한 일을 한 줄씩 적으면 종이별이 되어 유리병에 쌓이는 감사 일기장." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫙</text></svg>" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="brand">🫙 감사 일기장</div>
+        <div class="tag" id="jar-count">아직 채워진 별이 없어요</div>
+      </header>
+
+      <section class="jar-card">
+        <div class="jar" id="jar">
+          <div class="jar-lid"></div>
+          <div class="jar-neck"></div>
+          <div class="jar-body">
+            <div class="jar-stars" id="jar-stars"></div>
+            <div class="jar-shine"></div>
+          </div>
+        </div>
+        <p class="jar-hint">별을 하나씩 접어 감사한 마음을 채워보세요</p>
+      </section>
+
+      <div class="action-row">
+        <button id="write-btn" class="primary-btn" type="button">✏️ 감사일기 쓰기</button>
+        <button id="draw-btn" class="ghost-btn" type="button" disabled>⭐ 별 꺼내보기</button>
+      </div>
+    </div>
+
+    <!-- 작성 모달 -->
+    <div class="modal-overlay" id="write-modal" hidden>
+      <div class="modal-card" id="write-card" data-stage="write">
+        <button class="modal-close" id="write-close" type="button" aria-label="닫기">✕</button>
+
+        <div class="stage stage-write">
+          <h2>오늘 감사한 일을 적어보세요</h2>
+          <p class="modal-desc">한 줄씩 적으면 종이별이 되어 유리병에 담겨요.</p>
+          <textarea
+            id="entry-input"
+            class="entry-input"
+            rows="3"
+            maxlength="120"
+            placeholder="예: 오늘 점심에 먹은 김치찌개가 맛있었다"
+          ></textarea>
+          <ul class="pending-list" id="pending-list"></ul>
+          <div class="modal-btn-row">
+            <button id="add-more-btn" class="secondary-btn" type="button">➕ 추가로 적기</button>
+            <button id="done-btn" class="secondary-btn" type="button">완료</button>
+          </div>
+        </div>
+
+        <div class="stage stage-review">
+          <h2>별이 될 준비가 됐어요</h2>
+          <p class="modal-desc"><span id="review-count">0</span>개의 감사를 유리병에 담을게요.</p>
+          <ul class="review-list" id="review-list"></ul>
+          <div class="modal-btn-row">
+            <button id="back-to-write-btn" class="secondary-btn" type="button">✏️ 다시 쓰기</button>
+            <button id="save-jar-btn" class="primary-btn" type="button">🫙 유리병에 저장하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 별 꺼내기 모달 -->
+    <div class="modal-overlay" id="draw-modal" hidden>
+      <div class="modal-card star-reveal">
+        <button class="modal-close" id="draw-close" type="button" aria-label="닫기">✕</button>
+        <div class="reveal-star" id="reveal-star"></div>
+        <p class="reveal-date" id="reveal-date"></p>
+        <p class="reveal-text" id="reveal-text"></p>
+        <div class="modal-btn-row">
+          <button id="draw-again-btn" class="secondary-btn" type="button">🔀 다른 별 뽑기</button>
+          <button id="reveal-delete-btn" class="danger-btn" type="button">🗑 지우기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
