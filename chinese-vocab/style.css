@@ -553,6 +553,31 @@ button.btn {
   color: var(--good);
 }
 
+.lvl-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.lvl-badge.lvl3 {
+  background: var(--good-soft);
+  color: var(--good);
+  border-color: var(--good);
+}
+.lvl-badge.lvl4 {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.lvl-badge.lvl5 {
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

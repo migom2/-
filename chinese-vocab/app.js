@@ -193,7 +193,10 @@
   }
 
   function dayBadge(w) {
-    return 'Day ' + w.day;
+    return 'Day ' + w.day + ' · HSK' + w.level;
+  }
+  function levelBadge(w) {
+    return '<span class="lvl-badge lvl' + w.level + '">HSK' + w.level + '</span>';
   }
 
   // ---------------- 플래시카드 ----------------
@@ -476,6 +479,8 @@
       '</p>' +
       '<p class="quiz-ko">' +
       esc(w.ko) +
+      ' ' +
+      levelBadge(w) +
       '</p>' +
       '<p class="quiz-hanzi hanzi">' +
       esc(w.hanzi) +
@@ -667,6 +672,8 @@
       '</p>' +
       '<p class="quiz-ko">' +
       esc(w.ko) +
+      ' ' +
+      levelBadge(w) +
       '</p>' +
       '<div class="tone-legend">1성 ˉ · 2성 ˊ · 3성 ˇ · 4성 ˋ · 경성 ·</div>' +
       '<div class="tone-syllables">' +
@@ -738,6 +745,7 @@
           '<div class="wko">' +
           esc(w.ko) +
           '</div>' +
+          levelBadge(w) +
           '<span class="badge ' +
           st +
           '">' +
@@ -831,6 +839,29 @@
     var acc = attemptSum > 0 ? Math.round((correctSum / attemptSum) * 100) : 0;
     var pct = total > 0 ? Math.round((known / total) * 100) : 0;
 
+    var levelRows = '';
+    [3, 4, 5].forEach(function (lvl) {
+      var lvlWords = WORDS.filter(function (w) {
+        return w.level === lvl;
+      });
+      var lvlKnown = lvlWords.filter(function (w) {
+        return getEntry(w.id).status === 'known';
+      }).length;
+      var lvlPct = lvlWords.length > 0 ? Math.round((lvlKnown / lvlWords.length) * 100) : 0;
+      levelRows +=
+        '<div class="day-progress-row">' +
+        '<span class="day-progress-label">HSK' +
+        lvl +
+        '</span>' +
+        '<div class="pbar-o small"><div class="pbar-i" style="width:' +
+        lvlPct +
+        '%"></div></div>' +
+        '<span class="day-progress-pct">' +
+        lvlPct +
+        '%</span>' +
+        '</div>';
+    });
+
     var dayRows = '';
     for (var d = 1; d <= TOTAL_DAYS; d++) {
       var dayWords = WORDS.filter(function (w) {
@@ -880,6 +911,9 @@
       '<div class="pbar-o"><div class="pbar-i" style="width:' +
       pct +
       '%"></div></div>' +
+      '<div class="quiz-stat"><h3>급수별 암기 완료율</h3><div class="day-progress-list">' +
+      levelRows +
+      '</div></div>' +
       '<div class="quiz-stat"><h3>Day별 암기 완료율</h3><div class="day-progress-list">' +
       dayRows +
       '</div></div>';
