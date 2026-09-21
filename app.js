@@ -226,8 +226,31 @@
     saveProgress();
   }
 
+  var WEAK_THRESHOLD = 2;
+  var MASTERED_THRESHOLD = 2;
+
+  function allWordsCombined() {
+    return WORDS.concat(state.customWords);
+  }
+  function isWeak(entry) {
+    return (entry.wrong || 0) >= WEAK_THRESHOLD;
+  }
+  function isMastered(entry) {
+    return (entry.correct || 0) >= MASTERED_THRESHOLD;
+  }
+
   function getPool() {
     if (state.day === 'all') return WORDS;
+    if (state.day === 'weak') {
+      return allWordsCombined().filter(function (w) {
+        return isWeak(getEntry(w.id));
+      });
+    }
+    if (state.day === 'mastered') {
+      return allWordsCombined().filter(function (w) {
+        return isMastered(getEntry(w.id));
+      });
+    }
     if (state.day === 'custom-all') return state.customWords;
     if (typeof state.day === 'string' && state.day.indexOf('custom-') === 0) {
       var catId = state.day.slice('custom-'.length);
@@ -261,6 +284,16 @@
       html += '<option value="' + d + '">Day ' + d + '</option>';
     }
     html += '</optgroup>';
+    var weakCount = allWordsCombined().filter(function (w) {
+      return isWeak(getEntry(w.id));
+    }).length;
+    var masteredCount = allWordsCombined().filter(function (w) {
+      return isMastered(getEntry(w.id));
+    }).length;
+    html += '<optgroup label="복습">';
+    html += '<option value="weak">🔴 틀린 단어 모음 (' + weakCount + ')</option>';
+    html += '<option value="mastered">🟢 외운 단어 (' + masteredCount + ')</option>';
+    html += '</optgroup>';
     if (state.customCategories.length > 0) {
       html += '<optgroup label="내 단어장">';
       html += '<option value="custom-all">내 단어 전체 (' + state.customWords.length + ')</option>';
@@ -285,7 +318,7 @@
       sel.dataset.bound = '1';
       sel.addEventListener('change', function (e) {
         var v = e.target.value;
-        if (v === 'all' || v === 'custom-all' || v.indexOf('custom-') === 0) {
+        if (v === 'all' || v === 'weak' || v === 'mastered' || v === 'custom-all' || v.indexOf('custom-') === 0) {
           state.day = v;
         } else {
           state.day = parseInt(v, 10);
