@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>중국어 단어장 (HSK 3~4급)</title>
+    <meta name="description" content="HSK 3~4급 수준 필수 어휘 3000개, 하루 30개씩 Day 1~100. 플래시카드·병음 퀴즈·성조 맞추기 게임으로 완성하는 중국어 단어장." />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="중국어 단어장 (HSK 3~4급)" />
+    <meta property="og:description" content="매일 30개씩, HSK 3~4급 3000단어. 플래시카드·병음 퀴즈·성조 게임으로 완성해요." />
+    <meta property="og:url" content="https://migom2.github.io/-/chinese-vocab/" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="중국어 단어장 (HSK 3~4급)" />
+    <meta name="twitter:description" content="매일 30개씩, HSK 3~4급 3000단어. 플래시카드·병음 퀴즈·성조 게임으로 완성해요." />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🀄</text></svg>" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="brand">🀄 중국어 단어장</div>
+        <div class="tag">HSK 3~4급 수준 필수 어휘 3000 · Day 1~100</div>
+      </header>
+      <div class="day-row">
+        <label for="day-select">학습 범위</label>
+        <select id="day-select" class="select"></select>
+      </div>
+      <nav class="tabs" id="tabs"></nav>
+      <main class="panel" id="panel"></main>
+    </div>
+
+    <script src="words.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
