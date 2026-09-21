@@ -302,7 +302,7 @@ button.btn {
   color: #fff;
 }
 .btn-ghost {
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink-soft);
   border-color: var(--line);
 }
