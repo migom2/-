@@ -18,16 +18,36 @@
 
       <section class="jar-card">
         <div class="jar" id="jar">
-          <div class="jar-ground-shadow"></div>
-          <div class="jar-lid">
-            <div class="jar-lid-top"></div>
-          </div>
-          <div class="jar-neck"></div>
-          <div class="jar-body">
-            <div class="jar-stars" id="jar-stars"></div>
-            <div class="jar-shine jar-shine-1"></div>
-            <div class="jar-shine jar-shine-2"></div>
-          </div>
+          <div class="jar-stars" id="jar-stars"></div>
+
+          <svg class="jar-svg" viewBox="0 0 240 340" aria-hidden="true">
+            <defs>
+              <filter id="jar-sketchy" x="-15%" y="-15%" width="130%" height="130%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" seed="7" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+            </defs>
+            <g filter="url(#jar-sketchy)">
+              <rect class="jar-ink" x="72" y="16" width="96" height="30" rx="7" />
+              <ellipse class="jar-ink" cx="120" cy="16" rx="48" ry="7" />
+              <line class="jar-ink-thin" x1="78" y1="25" x2="162" y2="25" />
+              <line class="jar-ink-thin" x1="78" y1="32" x2="162" y2="32" />
+              <line class="jar-ink-thin" x1="78" y1="39" x2="162" y2="39" />
+              <path class="jar-ink" d="M 76 46 Q 46 64 42 92" />
+              <path class="jar-ink" d="M 164 46 Q 194 64 198 92" />
+              <rect class="jar-ink" x="42" y="82" width="156" height="226" rx="16" />
+              <ellipse class="jar-ink" cx="120" cy="296" rx="74" ry="13" />
+              <rect class="jar-ink jar-label-rect" x="80" y="184" width="116" height="56" rx="6" />
+              <line class="jar-ink-thin" x1="58" y1="108" x2="56" y2="270" stroke-dasharray="1 9" />
+              <line class="jar-ink-thin" x1="182" y1="120" x2="196" y2="132" opacity="0.5" />
+              <line class="jar-ink-thin" x1="184" y1="150" x2="198" y2="162" opacity="0.5" />
+              <line class="jar-ink-thin" x1="180" y1="180" x2="194" y2="192" opacity="0.4" />
+              <line class="jar-ink-thin" x1="182" y1="250" x2="196" y2="262" opacity="0.4" />
+              <line class="jar-ink-thin" x1="180" y1="280" x2="192" y2="290" opacity="0.4" />
+            </g>
+          </svg>
+
+          <div class="jar-label-text" id="jar-label-text">0</div>
         </div>
         <p class="jar-hint">색종이에 감사를 적어 별을 접어보세요</p>
       </section>
