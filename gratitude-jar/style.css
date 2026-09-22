@@ -72,7 +72,7 @@ body {
 .jar {
   position: relative;
   width: 220px;
-  aspect-ratio: 240 / 340;
+  aspect-ratio: 240 / 296;
 }
 
 .jar-ground-shadow {
@@ -94,42 +94,54 @@ body {
   overflow: visible;
 }
 
-.jar-pool {
-  fill: rgba(130, 95, 175, 0.14);
-}
-
 .jar-glass {
   fill: url(#glass-grad);
-  stroke: #6d5591;
+  stroke: #8a8ab0;
   stroke-width: 2.2;
   stroke-linejoin: round;
 }
 
-.jar-lid {
-  fill: url(#lid-grad);
-  stroke: #6d5591;
+.jar-neck-ring {
+  fill: url(#glass-grad);
+  stroke: #8a8ab0;
+  stroke-width: 1.8;
+}
+
+.jar-cork {
+  fill: url(#cork-grad);
+  stroke: #8a6239;
   stroke-width: 2.2;
 }
 
-.jar-lid-top {
-  fill: #f6effc;
-  stroke: #6d5591;
-  stroke-width: 2;
+.jar-cork-top {
+  fill: #ecd2ab;
+  stroke: #8a6239;
+  stroke-width: 1.8;
 }
 
-.jar-thread {
-  stroke: #a985cf;
-  stroke-width: 1.4;
+.jar-cork-texture {
+  stroke: #8a6239;
+  stroke-width: 1.1;
   stroke-linecap: round;
+  opacity: 0.45;
 }
 
-.jar-shine-broad {
+.jar-shine-pink {
   fill: none;
-  stroke: #ffffff;
+  stroke: #f3bcd4;
+  stroke-width: 10;
+  stroke-linecap: round;
+  opacity: 0.3;
+  filter: blur(3px);
+}
+
+.jar-shine-blue {
+  fill: none;
+  stroke: #b9d6f5;
   stroke-width: 9;
   stroke-linecap: round;
-  opacity: 0.35;
-  filter: blur(2.5px);
+  opacity: 0.28;
+  filter: blur(3px);
 }
 
 .jar-shine-thin {
@@ -137,25 +149,17 @@ body {
   stroke: #ffffff;
   stroke-width: 3;
   stroke-linecap: round;
-  opacity: 0.65;
-}
-
-.jar-shine-lid {
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 2.5;
-  stroke-linecap: round;
   opacity: 0.7;
 }
 
 .jar-stars {
   position: absolute;
-  left: 17.5%;
-  top: 29.4%;
-  width: 65%;
-  height: 46.5%;
+  left: 16.67%;
+  top: 32.43%;
+  width: 66.67%;
+  height: 48.65%;
   overflow: hidden;
-  border-radius: 8px 8px 60px 60px;
+  border-radius: 6px 6px 26px 26px;
 }
 
 .paper-star {

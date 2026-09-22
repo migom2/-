@@ -21,16 +21,15 @@
           <div class="jar-ground-shadow"></div>
           <div class="jar-stars" id="jar-stars"></div>
 
-          <svg class="jar-svg" viewBox="0 0 240 340" aria-hidden="true">
+          <svg class="jar-svg" viewBox="0 0 240 296" aria-hidden="true">
             <defs>
-              <linearGradient id="glass-grad" x1="0%" y1="0%" x2="20%" y2="100%">
-                <stop offset="0%" stop-color="#ede4fb" stop-opacity="0.22" />
-                <stop offset="55%" stop-color="#d5c3f3" stop-opacity="0.2" />
-                <stop offset="100%" stop-color="#b39ce2" stop-opacity="0.34" />
+              <linearGradient id="glass-grad" x1="0%" y1="0%" x2="15%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12" />
+                <stop offset="100%" stop-color="#dcd6ec" stop-opacity="0.18" />
               </linearGradient>
-              <linearGradient id="lid-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#f6effc" />
-                <stop offset="100%" stop-color="#cbabe8" />
+              <linearGradient id="cork-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#e7c99d" />
+                <stop offset="100%" stop-color="#b9895b" />
               </linearGradient>
               <filter id="jar-wobble" x="-15%" y="-15%" width="130%" height="130%">
                 <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="2" seed="4" result="noise" />
@@ -38,30 +37,33 @@
               </filter>
             </defs>
 
-            <ellipse class="jar-pool" cx="120" cy="296" rx="64" ry="16" />
-
             <g filter="url(#jar-wobble)">
               <path
                 class="jar-glass"
-                d="M 76 46
-                   C 55 46 42 60 42 100
-                   L 42 258
-                   C 42 296 64 314 120 314
-                   C 176 314 198 296 198 258
-                   L 198 100
-                   C 198 60 185 46 164 46
+                d="M 74 54
+                   C 52 54 40 66 40 96
+                   L 40 240
+                   C 40 258 54 270 74 270
+                   L 166 270
+                   C 186 270 200 258 200 240
+                   L 200 96
+                   C 200 66 188 54 166 54
                    Z"
               />
-              <rect class="jar-lid" x="70" y="14" width="100" height="32" rx="11" />
-              <ellipse class="jar-lid-top" cx="120" cy="14" rx="50" ry="8" />
-              <line class="jar-thread" x1="76" y1="24" x2="164" y2="24" />
-              <line class="jar-thread" x1="76" y1="32" x2="164" y2="32" />
-              <line class="jar-thread" x1="76" y1="40" x2="164" y2="40" />
+              <rect class="jar-neck-ring" x="74" y="40" width="92" height="14" rx="5" />
+              <rect class="jar-cork" x="86" y="8" width="68" height="34" rx="10" />
+              <ellipse class="jar-cork-top" cx="120" cy="8" rx="34" ry="7" />
+              <path class="jar-cork-texture" d="M 96 18 L 106 15" />
+              <path class="jar-cork-texture" d="M 112 24 L 124 21" />
+              <path class="jar-cork-texture" d="M 130 16 L 140 19" />
+              <path class="jar-cork-texture" d="M 100 30 L 110 33" />
+              <path class="jar-cork-texture" d="M 122 34 L 134 31" />
+              <path class="jar-cork-texture" d="M 138 27 L 146 30" />
             </g>
 
-            <path class="jar-shine-broad" d="M 66 108 C 60 160 60 220 68 266" />
-            <path class="jar-shine-thin" d="M 92 118 C 88 168 88 218 94 254" />
-            <path class="jar-shine-lid" d="M 88 20 C 96 26 112 29 120 29" />
+            <path class="jar-shine-pink" d="M 62 112 C 56 152 56 194 64 228" />
+            <path class="jar-shine-blue" d="M 148 110 C 155 152 155 194 146 228" />
+            <path class="jar-shine-thin" d="M 92 118 C 88 156 88 196 94 222" />
           </svg>
         </div>
         <p class="jar-hint">색종이에 감사를 적어 별을 접어보세요</p>
