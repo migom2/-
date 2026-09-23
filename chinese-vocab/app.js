@@ -75,18 +75,25 @@
   function isMastered(w) {
     return getEntry(w.id).status === 'known';
   }
-  function unmasteredOf(pool) {
+  function unmasteredOf(pool, masteredFn) {
+    var fn = masteredFn || isMastered;
     return pool.filter(function (w) {
-      return !isMastered(w);
+      return !fn(w);
     });
   }
-  function masteredHint(pool) {
-    return '외운 단어 ' + (pool.length - unmasteredOf(pool).length) + ' / ' + pool.length;
+  function masteredHint(pool, masteredFn, noun) {
+    return '외운 ' + (noun || '단어') + ' ' + (pool.length - unmasteredOf(pool, masteredFn).length) + ' / ' + pool.length;
   }
   // 문제 수 선택 화면 (10문제 · 15문제 · 전체). 외운 단어는 출제하지 않아요.
-  function renderCountSetup(panel, intro, pool, onStart) {
-    var remaining = unmasteredOf(pool);
-    var html = '<div class="empty"><p>' + intro + '</p>' + '<p class="meta" style="margin:0">' + masteredHint(pool) + '</p>';
+  function renderCountSetup(panel, intro, pool, onStart, masteredFn, noun, extraHtml) {
+    var remaining = unmasteredOf(pool, masteredFn);
+    var html =
+      '<div class="empty"><p>' +
+      intro +
+      '</p>' +
+      '<p class="meta" style="margin:0">' +
+      masteredHint(pool, masteredFn, noun) +
+      '</p>';
     if (pool.length === 0) {
       html += '<p>이 범위에는 단어가 없어요.</p></div>';
       panel.innerHTML = html;
@@ -94,8 +101,10 @@
     }
     if (remaining.length === 0) {
       html +=
-        '<p>🎉 이 범위 단어를 모두 외웠어요!</p>' +
-        '<button class="btn btn-primary full-width" id="count-review-all">외운 단어까지 전체 복습하기</button></div>';
+        '<p>🎉 모두 외웠어요!</p>' +
+        '<button class="btn btn-primary full-width" id="count-review-all">외운 것까지 전체 복습하기</button>' +
+        (extraHtml || '') +
+        '</div>';
       panel.innerHTML = html;
       document.getElementById('count-review-all').addEventListener('click', function () {
         onStart(shuffle(pool));
@@ -122,7 +131,9 @@
           );
         })
         .join('') +
-      '</div></div>';
+      '</div>' +
+      (extraHtml || '') +
+      '</div>';
     panel.innerHTML = html;
     Array.prototype.forEach.call(panel.querySelectorAll('[data-count]'), function (btn) {
       btn.addEventListener('click', function () {
@@ -162,6 +173,8 @@
     cardFlipped: false,
     quiz: { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] },
     tone: { stage: 'setup', items: [], index: 0, answers: [], checked: false, score: 0, wrong: [] },
+    build: { stage: 'setup', items: [], index: 0, tiles: [], picked: [], checked: false, score: 0, wrong: [] },
+    buildProgress: loadBuildProgress(),
     wordQuery: '',
     wordStatus: 'all',
     confirmingReset: false,
@@ -229,6 +242,7 @@
     { key: 'cards', label: '📇 플래시카드' },
     { key: 'quiz', label: '📝 병음 퀴즈' },
     { key: 'tone', label: '🎯 성조 게임' },
+    { key: 'build', label: '🧩 한자 조립' },
     { key: 'words', label: '📚 단어장' },
     { key: 'stats', label: '📊 통계' },
   ];
@@ -955,12 +969,348 @@
       '</div></div>';
   }
 
+
+  // ---------------- 한자 조립 게임 (이야기 읽고 조각 맞추기) ----------------
+  // (함수 선언은 호이스팅되지만 var 값은 아니라서 키를 함수 안에 둬요 — state 초기화 때 호출됨)
+  function buildKey() {
+    return 'zh-hanzi-build-v1';
+  }
+  function loadBuildProgress() {
+    try {
+      var raw = localStorage.getItem(buildKey());
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveBuildProgress() {
+    try {
+      localStorage.setItem(buildKey(), JSON.stringify(state.buildProgress));
+    } catch (e) {}
+  }
+  function isBuildMastered(h) {
+    var e = state.buildProgress[h.ch];
+    return !!e && e.status === 'known';
+  }
+  function recordBuild(h, isCorrect) {
+    var e = state.buildProgress[h.ch] || { correct: 0, wrong: 0, status: 'new' };
+    var correct = (e.correct || 0) + (isCorrect ? 1 : 0);
+    var known = isCorrect && (e.status === 'known' || correct >= MASTERED_THRESHOLD);
+    state.buildProgress[h.ch] = {
+      correct: correct,
+      wrong: (e.wrong || 0) + (isCorrect ? 0 : 1),
+      status: known ? 'known' : 'learning',
+    };
+    saveBuildProgress();
+  }
+  function partLabel(c) {
+    return HANZI_COMPONENTS[c] || '';
+  }
+  function storyHtml(story) {
+    return esc(story).replace(/【(.*?)】/g, '<mark class="story-key">$1</mark>');
+  }
+  function equationHtml(h) {
+    return (
+      '<span class="build-eq">' +
+      h.parts
+        .map(function (c) {
+          return '<span class="hanzi">' + esc(c) + '</span><small>' + esc(partLabel(c)) + '</small>';
+        })
+        .join('<i>+</i>') +
+      '<i>=</i><b class="hanzi">' +
+      esc(h.ch) +
+      '</b></span>'
+    );
+  }
+  function exampleWordsHtml(h) {
+    var ex = WORDS.filter(function (w) {
+      return w.hanzi.indexOf(h.ch) !== -1;
+    }).slice(0, 2);
+    if (ex.length === 0) return '';
+    return (
+      '<p class="hint build-ex">이 한자가 들어간 단어: ' +
+      ex
+        .map(function (w) {
+          return '<b class="hanzi">' + esc(w.hanzi) + '</b> ' + esc(w.pinyin) + ' (' + esc(w.ko) + ')';
+        })
+        .join(' · ') +
+      '</p>'
+    );
+  }
+  // 정답 조각 + 헷갈리지 않는 오답 조각(뜻이 겹치지 않는 것) 섞기, 총 6~7장
+  function buildTiles(h) {
+    var labels = h.parts.map(partLabel);
+    var others = shuffle(
+      Object.keys(HANZI_COMPONENTS).filter(function (c) {
+        return h.parts.indexOf(c) === -1 && labels.indexOf(partLabel(c)) === -1;
+      })
+    );
+    var picked = [];
+    var usedLabels = labels.slice();
+    for (var i = 0; i < others.length && picked.length < Math.max(4, 6 - h.parts.length); i++) {
+      if (usedLabels.indexOf(partLabel(others[i])) !== -1) continue;
+      usedLabels.push(partLabel(others[i]));
+      picked.push(others[i]);
+    }
+    return shuffle(h.parts.concat(picked));
+  }
+  function startBuild(items) {
+    var b = state.build;
+    b.stage = 'active';
+    b.items = items;
+    b.index = 0;
+    b.score = 0;
+    b.wrong = [];
+    prepareBuildItem();
+    render();
+  }
+  function prepareBuildItem() {
+    var b = state.build;
+    b.picked = [];
+    b.checked = false;
+    b.lastCorrect = null;
+    if (b.index < b.items.length) b.tiles = buildTiles(b.items[b.index]);
+  }
+
+  function renderBuild() {
+    var panel = document.getElementById('panel');
+    var b = state.build;
+    var all = HANZI_PARTS;
+
+    if (b.stage === 'dex') {
+      panel.innerHTML =
+        '<h2>📖 한자 도감</h2>' +
+        '<p class="meta">' +
+        masteredHint(all, isBuildMastered, '한자') +
+        ' · 눌러서 이야기 보기</p>' +
+        '<div class="dex-grid">' +
+        all
+          .map(function (h) {
+            return (
+              '<details class="dex-item' +
+              (isBuildMastered(h) ? ' known' : '') +
+              '"><summary><span class="hanzi">' +
+              esc(h.ch) +
+              '</span><small>' +
+              esc(h.ko) +
+              '</small></summary><div class="dex-body">' +
+              equationHtml(h) +
+              '<p class="build-py">' +
+              esc(h.py) +
+              '</p><p class="build-story">' +
+              storyHtml(h.story) +
+              '</p></div></details>'
+            );
+          })
+          .join('') +
+        '</div>' +
+        '<button class="btn btn-primary full-width" id="dex-back">게임으로 돌아가기</button>';
+      document.getElementById('dex-back').addEventListener('click', function () {
+        b.stage = 'setup';
+        render();
+      });
+      return;
+    }
+
+    if (b.stage === 'setup') {
+      renderCountSetup(
+        panel,
+        '이야기를 읽고 한자 조각을 골라 한자를 조립해요. 【】 안의 말이 조각 카드의 뜻이에요. 2번 맞힌 한자는 외운 한자가 되어 더 이상 나오지 않아요. (학습 범위와 상관없이 ' +
+          all.length +
+          '자에서 출제)',
+        all,
+        startBuild,
+        isBuildMastered,
+        '한자',
+        '<button class="btn btn-ghost full-width" id="open-dex">📖 한자 도감 보기</button>'
+      );
+      document.getElementById('open-dex').addEventListener('click', function () {
+        b.stage = 'dex';
+        render();
+      });
+      return;
+    }
+
+    if (b.stage === 'active' && b.index >= b.items.length) b.stage = 'done';
+
+    if (b.stage === 'done') {
+      panel.innerHTML =
+        '<div class="score">' +
+        b.score +
+        ' / ' +
+        b.items.length +
+        '</div>' +
+        '<p class="meta">' +
+        masteredHint(all, isBuildMastered, '한자') +
+        '</p>' +
+        (b.wrong.length > 0
+          ? '<div class="wrong-list"><h3>틀린 한자</h3><ul>' +
+            b.wrong
+              .map(function (h) {
+                return '<li>' + equationHtml(h) + ' ' + esc(h.ko) + '</li>';
+              })
+              .join('') +
+            '</ul></div>'
+          : '<p class="hint" style="text-align:center">🎉 전부 맞혔어요!</p>') +
+        '<div class="setup-row">' +
+        (b.wrong.length > 0 ? '<button class="btn btn-bad" id="build-retry-wrong">틀린 것만 다시</button>' : '') +
+        '<button class="btn btn-primary" id="build-new">새 문제 풀기</button>' +
+        '</div>';
+      var rw = document.getElementById('build-retry-wrong');
+      if (rw)
+        rw.addEventListener('click', function () {
+          startBuild(shuffle(b.wrong));
+        });
+      document.getElementById('build-new').addEventListener('click', function () {
+        b.stage = 'setup';
+        render();
+      });
+      return;
+    }
+
+    var h = b.items[b.index];
+    var slotsHtml = h.parts
+      .map(function (_, i) {
+        var ti = b.picked[i];
+        var filled = ti !== undefined;
+        return (
+          '<button class="build-slot' +
+          (filled ? ' filled' : '') +
+          '" data-slot="' +
+          i +
+          '"' +
+          (b.checked || !filled ? ' disabled' : '') +
+          '>' +
+          (filled ? '<span class="hanzi">' + esc(b.tiles[ti]) + '</span>' : '?') +
+          '</button>'
+        );
+      })
+      .join('<span class="build-plus">+</span>');
+    var tilesHtml = b.tiles
+      .map(function (c, i) {
+        var used = b.picked.indexOf(i) !== -1;
+        return (
+          '<button class="build-tile' +
+          (used ? ' used' : '') +
+          '" data-tile="' +
+          i +
+          '"' +
+          (used || b.checked ? ' disabled' : '') +
+          '><span class="hanzi">' +
+          esc(c) +
+          '</span><small>' +
+          esc(partLabel(c)) +
+          '</small></button>'
+        );
+      })
+      .join('');
+    var full = b.picked.length === h.parts.length;
+    var resultHtml = '';
+    if (b.checked) {
+      resultHtml =
+        '<div class="build-result ' +
+        (b.lastCorrect ? 'good' : 'bad') +
+        '"><p class="build-verdict">' +
+        (b.lastCorrect ? '정답! 🎉' : '아쉬워요. 정답은') +
+        '</p>' +
+        equationHtml(h) +
+        '<p class="build-py">' +
+        esc(h.py) +
+        ' · ' +
+        esc(h.ko) +
+        '</p>' +
+        exampleWordsHtml(h) +
+        '</div>' +
+        '<button class="btn btn-primary full-width" id="build-next">다음</button>';
+    } else {
+      resultHtml =
+        '<div class="setup-row">' +
+        '<button class="btn btn-ghost" id="build-idk">모르겠어요</button>' +
+        '<button class="btn btn-primary" id="build-check"' +
+        (full ? '' : ' disabled') +
+        '>확인</button></div>';
+    }
+
+    panel.innerHTML =
+      '<p class="meta">' +
+      (b.index + 1) +
+      ' / ' +
+      b.items.length +
+      ' · ' +
+      masteredHint(all, isBuildMastered, '한자') +
+      '</p>' +
+      '<p class="quiz-ko">' +
+      esc(h.ko) +
+      ' <span class="build-py-inline">' +
+      esc(h.py) +
+      '</span></p>' +
+      '<p class="build-story">' +
+      storyHtml(h.story) +
+      '</p>' +
+      '<div class="build-slots">' +
+      slotsHtml +
+      '<span class="build-plus">=</span><span class="build-target hanzi">' +
+      (b.checked ? esc(h.ch) : '?') +
+      '</span></div>' +
+      '<div class="build-tiles">' +
+      tilesHtml +
+      '</div>' +
+      resultHtml;
+
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-tile]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (b.checked || b.picked.length >= h.parts.length) return;
+        b.picked.push(parseInt(btn.getAttribute('data-tile'), 10));
+        render();
+      });
+    });
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-slot]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (b.checked) return;
+        b.picked.splice(parseInt(btn.getAttribute('data-slot'), 10), 1);
+        render();
+      });
+    });
+    function finish(isCorrect) {
+      b.checked = true;
+      b.lastCorrect = isCorrect;
+      if (isCorrect) b.score++;
+      else b.wrong.push(h);
+      recordBuild(h, isCorrect);
+      render();
+    }
+    var check = document.getElementById('build-check');
+    if (check)
+      check.addEventListener('click', function () {
+        var chosen = b.picked
+          .map(function (i) {
+            return b.tiles[i];
+          })
+          .sort()
+          .join('');
+        finish(chosen === h.parts.slice().sort().join(''));
+      });
+    var idk = document.getElementById('build-idk');
+    if (idk)
+      idk.addEventListener('click', function () {
+        finish(false);
+      });
+    var next = document.getElementById('build-next');
+    if (next)
+      next.addEventListener('click', function () {
+        b.index++;
+        prepareBuildItem();
+        render();
+      });
+  }
+
   function render() {
     renderDaySelect();
     renderTabs();
     if (state.tab === 'cards') renderCards();
     else if (state.tab === 'quiz') renderQuiz();
     else if (state.tab === 'tone') renderTone();
+    else if (state.tab === 'build') renderBuild();
     else if (state.tab === 'words') renderWords();
     else if (state.tab === 'stats') renderStats();
   }

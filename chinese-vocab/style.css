@@ -761,3 +761,204 @@ h2 {
     transition: none;
   }
 }
+
+/* ---------- 한자 조립 게임 ---------- */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.build-py-inline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--accent-ink);
+  margin-left: 4px;
+}
+.build-story {
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+}
+.story-key {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.build-slots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.build-slot,
+.build-target {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+.build-slot {
+  font: inherit;
+  font-size: 22px;
+  color: var(--ink-soft);
+  border: 2px dashed var(--line);
+  background: var(--surface);
+  cursor: pointer;
+}
+.build-slot.filled {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--ink);
+  font-size: 30px;
+}
+.build-slot:disabled {
+  cursor: default;
+}
+.build-target {
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.build-plus {
+  font-size: 20px;
+  color: var(--ink-soft);
+}
+.build-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.build-tile {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.build-tile .hanzi {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.build-tile small {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.build-tile.used {
+  opacity: 0.3;
+}
+.build-tile:disabled {
+  cursor: default;
+}
+.build-result {
+  text-align: center;
+  padding: 14px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+}
+.build-result.good {
+  background: var(--good-soft);
+  border-color: var(--good);
+}
+.build-result.bad {
+  background: var(--bad-soft);
+  border-color: var(--bad);
+}
+.build-verdict {
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.build-eq {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.build-eq .hanzi {
+  font-size: 20px;
+}
+.build-eq small {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-right: 2px;
+}
+.build-eq i {
+  font-style: normal;
+  color: var(--ink-soft);
+  margin: 0 2px;
+}
+.build-eq b {
+  font-size: 26px;
+}
+.build-py {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+}
+.build-ex {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+.dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.dex-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.dex-item[open] {
+  grid-column: 1 / -1;
+}
+.dex-item.known {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+.dex-item summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px;
+}
+.dex-item summary::-webkit-details-marker {
+  display: none;
+}
+.dex-item summary .hanzi {
+  font-size: 28px;
+}
+.dex-item summary small {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.dex-body {
+  padding: 0 12px 12px;
+  text-align: center;
+}
+.dex-body .build-story {
+  text-align: left;
+  margin-bottom: 0;
+}
