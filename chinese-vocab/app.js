@@ -804,7 +804,18 @@
       syllHtml +
       '</div>' +
       (t.checked
-        ? '<button class="btn btn-primary full-width" id="tone-next">다음</button>'
+        ? '<div class="build-result tone-answer ' +
+          (t.lastCorrect ? 'good' : 'bad') +
+          '"><p class="build-verdict">' +
+          (t.lastCorrect ? '정답! 🎉' : '정답은') +
+          '</p><p class="tone-answer-hanzi hanzi">' +
+          esc(w.hanzi) +
+          '</p><p class="tone-answer-pinyin">' +
+          esc(w.pinyin) +
+          '</p><p class="hint" style="margin:4px 0 0">' +
+          esc(w.ko) +
+          '</p></div>' +
+          '<button class="btn btn-primary full-width" id="tone-next">다음</button>'
         : '<button class="btn btn-primary full-width" id="tone-check" ' +
           (allSelected ? '' : 'disabled') +
           '>확인</button>');
@@ -825,6 +836,7 @@
           return t.answers[i] === s.tone;
         });
         t.checked = true;
+        t.lastCorrect = allCorrect;
         if (allCorrect) t.score++;
         else t.wrong.push(w);
         recordResult(w.id, allCorrect);
