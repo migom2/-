@@ -19,6 +19,11 @@
       // localStorage 사용 불가 시(사생활 보호 모드 등) 조용히 무시
     }
   }
+  // Ask the browser not to evict saved progress when storage runs low.
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {}
+
   function getEntry(id) {
     return state.progress[id] || { status: 'new', correct: 0, wrong: 0 };
   }
@@ -29,10 +34,14 @@
   }
   function recordResult(id, isCorrect) {
     var entry = state.progress[id] || { status: 'new', correct: 0, wrong: 0 };
+    var correct = (entry.correct || 0) + (isCorrect ? 1 : 0);
+    // Once a word is 암기완료 (from a flashcard or enough correct answers) it
+    // stays that way until the learner misses it again.
+    var known = isCorrect && (entry.status === 'known' || correct >= MASTERED_THRESHOLD);
     state.progress[id] = {
-      correct: (entry.correct || 0) + (isCorrect ? 1 : 0),
+      correct: correct,
       wrong: (entry.wrong || 0) + (isCorrect ? 0 : 1),
-      status: isCorrect ? 'known' : 'learning',
+      status: known ? 'known' : 'learning',
     };
     saveProgress();
   }
@@ -232,8 +241,10 @@
   function isWeak(entry) {
     return (entry.wrong || 0) >= WEAK_THRESHOLD;
   }
+  // One definition of 암기완료 everywhere: the saved status, which flashcards
+  // set directly and quizzes set after MASTERED_THRESHOLD correct answers.
   function isMastered(entry) {
-    return (entry.correct || 0) >= MASTERED_THRESHOLD;
+    return entry.status === 'known';
   }
 
   function getPool() {
@@ -527,7 +538,7 @@
     });
   }
 
-  // Splits a pool into words already mastered (correct >= threshold, excluded
+  // Splits a pool into words already mastered (status 'known', excluded
   // from quiz) vs. the rest, further separating frequently-missed "important"
   // words so they can be placed at the end of the quiz session.
   function splitQuizPool(pool) {
