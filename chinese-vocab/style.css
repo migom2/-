@@ -984,3 +984,22 @@ h2 {
 .build-word-full .hanzi {
   font-size: 16px;
 }
+.quiz-meaning {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  word-break: keep-all;
+}
+.quiz-pinyin {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  color: var(--accent-ink);
+  margin: 0 0 4px;
+}
+.option-hanzi {
+  font-size: 22px;
+  text-align: center;
+}
+.quiz-mode-row {
+  margin-bottom: 14px;
+}

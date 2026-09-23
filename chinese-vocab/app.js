@@ -259,7 +259,7 @@
 
   var TABS = [
     { key: 'cards', label: '📇 플래시카드' },
-    { key: 'quiz', label: '📝 병음 퀴즈' },
+    { key: 'quiz', label: '📝 퀴즈' },
     { key: 'tone', label: '🎯 성조 게임' },
     { key: 'build', label: '🧩 한자 조립' },
     { key: 'words', label: '📚 단어장' },
@@ -437,17 +437,34 @@
   }
 
   // ---------------- 병음 퀴즈 (뜻+한자 → 병음 객관식) ----------------
-  function buildQuizQuestions(words) {
+  var IDK_OPTION = '모르겠어요';
+  // mode 'pinyin': 한자·뜻 보고 병음 고르기 / 'hanzi': 뜻·병음 보고 한자 고르기
+  function buildQuizQuestions(words, mode) {
     var pool = getPool();
+    if (pool.length < 5) pool = WORDS;
+    var key = mode === 'hanzi' ? 'hanzi' : 'pinyin';
     return words.map(function (w) {
       var others = pool.filter(function (x) {
-        return x.id !== w.id && x.pinyin !== w.pinyin;
+        return x.id !== w.id && x[key] !== w[key];
       });
-      var distractors = shuffle(others).slice(0, 4);
-      var options = shuffle(distractors.concat([w])).map(function (x) {
-        return x.pinyin;
+      // 한자 고르기는 글자 수가 같은 단어를 오답으로 우선 써서 헷갈리게
+      if (key === 'hanzi') {
+        var sameLen = others.filter(function (x) {
+          return x.hanzi.length === w.hanzi.length;
+        });
+        if (sameLen.length >= 4) others = sameLen;
+      }
+      var seen = {};
+      var distractors = [];
+      shuffle(others).forEach(function (x) {
+        if (distractors.length < 4 && !seen[x[key]]) {
+          seen[x[key]] = true;
+          distractors.push(x[key]);
+        }
       });
-      return { word: w, options: options };
+      var options = shuffle(distractors.concat([w[key]]));
+      options.push(IDK_OPTION);
+      return { word: w, options: options, answer: w[key] };
     });
   }
 
@@ -456,10 +473,11 @@
     var pool = getPool();
     var q = state.quiz;
 
+    q.mode = q.mode || 'pinyin';
     function startQuiz(words) {
       q.stage = 'active';
       q.count = words.length;
-      q.questions = buildQuizQuestions(words);
+      q.questions = buildQuizQuestions(words, q.mode);
       q.index = 0;
       q.selected = null;
       q.score = 0;
@@ -468,7 +486,31 @@
     }
 
     if (q.stage === 'setup') {
-      renderCountSetup(panel, '뜻과 한자를 보고 알맞은 병음을 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.', pool, startQuiz);
+      renderCountSetup(
+        panel,
+        q.mode === 'hanzi'
+          ? '뜻과 병음을 보고 알맞은 한자를 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.'
+          : '뜻과 한자를 보고 알맞은 병음을 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.',
+        pool,
+        startQuiz
+      );
+      panel.insertAdjacentHTML(
+        'afterbegin',
+        '<div class="setup-row quiz-mode-row">' +
+          '<button class="btn ' +
+          (q.mode === 'pinyin' ? 'btn-primary' : 'btn-ghost') +
+          '" data-qmode="pinyin">병음 고르기</button>' +
+          '<button class="btn ' +
+          (q.mode === 'hanzi' ? 'btn-primary' : 'btn-ghost') +
+          '" data-qmode="hanzi">한자 고르기</button>' +
+          '</div>'
+      );
+      Array.prototype.forEach.call(panel.querySelectorAll('[data-qmode]'), function (btn) {
+        btn.addEventListener('click', function () {
+          q.mode = btn.getAttribute('data-qmode');
+          render();
+        });
+      });
       return;
     }
 
@@ -515,7 +557,7 @@
           var wrongWords = pool.filter(function (w) {
             return wrongIds.indexOf(w.id) !== -1;
           });
-          q.questions = buildQuizQuestions(shuffle(wrongWords));
+          q.questions = buildQuizQuestions(shuffle(wrongWords), q.mode);
           q.stage = 'active';
           q.index = 0;
           q.selected = null;
@@ -536,11 +578,14 @@
 
     var current = q.questions[q.index];
     var w = current.word;
+    var hanziMode = q.mode === 'hanzi';
     var optionsHtml = current.options
       .map(function (opt) {
         var cls = 'option';
+        if (opt === IDK_OPTION) cls += ' option-idk';
+        else if (hanziMode) cls += ' option-hanzi hanzi';
         if (q.selected !== null) {
-          if (opt === w.pinyin) cls += ' correct';
+          if (opt === current.answer) cls += ' correct';
           else if (opt === q.selected) cls += ' wrong';
         }
         return '<button class="' + cls + '" data-opt="' + esc(opt) + '" ' + (q.selected !== null ? 'disabled' : '') + '>' + esc(opt) + '</button>';
@@ -555,14 +600,24 @@
       ' · ' +
       masteredHint(pool) +
       '</p>' +
-      '<p class="quiz-ko">' +
-      esc(w.ko) +
-      ' ' +
-      levelBadge(w) +
-      '</p>' +
-      '<p class="quiz-hanzi hanzi">' +
-      esc(w.hanzi) +
-      '</p>' +
+      (hanziMode
+        ? '<p class="quiz-ko">' +
+          levelBadge(w) +
+          '</p>' +
+          '<p class="quiz-meaning">' +
+          esc(w.ko) +
+          '</p>' +
+          '<p class="quiz-pinyin">' +
+          esc(w.pinyin) +
+          '</p>'
+        : '<p class="quiz-ko">' +
+          esc(w.ko) +
+          ' ' +
+          levelBadge(w) +
+          '</p>' +
+          '<p class="quiz-hanzi hanzi">' +
+          esc(w.hanzi) +
+          '</p>') +
       '<div class="options">' +
       optionsHtml +
       '</div>' +
@@ -573,7 +628,7 @@
         if (q.selected !== null) return;
         var opt = btn.getAttribute('data-opt');
         q.selected = opt;
-        var isCorrect = opt === w.pinyin;
+        var isCorrect = opt === current.answer;
         if (isCorrect) q.score++;
         else q.wrong.push(w);
         recordResult(w.id, isCorrect);
