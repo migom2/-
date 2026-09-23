@@ -1115,9 +1115,7 @@
     if (b.stage === 'setup') {
       renderCountSetup(
         panel,
-        '이야기를 읽고 한자 조각을 골라 한자를 조립해요. 【】 안의 말이 조각 카드의 뜻이에요. 2번 맞힌 한자는 외운 한자가 되어 더 이상 나오지 않아요. (학습 범위와 상관없이 ' +
-          all.length +
-          '자에서 출제)',
+        '뜻을 보고 부수를 골라 한자를 맞혀요.',
         all,
         startBuild,
         isBuildMastered,
@@ -1239,14 +1237,11 @@
       ' · ' +
       masteredHint(all, isBuildMastered, '한자') +
       '</p>' +
-      '<p class="quiz-ko">' +
+      '<p class="build-prompt">' +
       esc(h.ko) +
       ' <span class="build-py-inline">' +
       esc(h.py) +
       '</span></p>' +
-      '<p class="build-story">' +
-      storyHtml(h.story) +
-      '</p>' +
       '<div class="build-slots">' +
       slotsHtml +
       '<span class="build-plus">=</span><span class="build-target hanzi">' +

@@ -962,3 +962,9 @@ h2 {
   text-align: left;
   margin-bottom: 0;
 }
+.build-prompt {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 6px 0 18px;
+}
