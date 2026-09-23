@@ -90,6 +90,36 @@
   function isMastered(w) {
     return getEntry(w.id).status === 'known';
   }
+  // 구역별 외운 단어: 병음 퀴즈 / 한자 퀴즈 / 성조 게임은 따로따로 기록해요. (한자 조립은 한자 단위로 따로 기록)
+  var SECTION_NAMES = { pinyin: '병음 퀴즈', hanzi: '한자 퀴즈', tone: '성조 게임', build: '한자 조립' };
+  function loadMastery() {
+    var m = null;
+    try {
+      m = JSON.parse(localStorage.getItem('zh-vocab-mastery-v1') || 'null');
+    } catch (e) {}
+    m = m && typeof m === 'object' ? m : {};
+    ['pinyin', 'hanzi', 'tone'].forEach(function (k) {
+      if (!m[k] || typeof m[k] !== 'object') m[k] = {};
+    });
+    return m;
+  }
+  var mastery = loadMastery();
+  function recordMode(mode, id, isCorrect) {
+    var e = mastery[mode][id] || { correct: 0, wrong: 0, status: 'new' };
+    var correct = (e.correct || 0) + (isCorrect ? 1 : 0);
+    var known = isCorrect && (e.status === 'known' || correct >= MASTERED_THRESHOLD);
+    mastery[mode][id] = { correct: correct, wrong: (e.wrong || 0) + (isCorrect ? 0 : 1), status: known ? 'known' : 'learning' };
+    try {
+      localStorage.setItem('zh-vocab-mastery-v1', JSON.stringify(mastery));
+    } catch (err) {}
+  }
+  function modeMastered(mode) {
+    return function (w) {
+      var e = mastery[mode][w.id];
+      return !!e && e.status === 'known';
+    };
+  }
+
   function unmasteredOf(pool, masteredFn) {
     var fn = masteredFn || isMastered;
     return pool.filter(function (w) {
@@ -110,7 +140,8 @@
       (state.day === 'all' ? '전체 (Day 1~' + TOTAL_DAYS + ')' : 'Day ' + state.day) +
       ' · ' +
       masteredHint(pool, masteredFn, noun) +
-      '</p>';
+      '</p>' +
+      dayProgressHtml();
     if (pool.length === 0) {
       html += '<p>이 범위에는 단어가 없어요.</p></div>';
       panel.innerHTML = html;
@@ -492,7 +523,8 @@
           ? '뜻과 병음을 보고 알맞은 한자를 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.'
           : '뜻과 한자를 보고 알맞은 병음을 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.',
         pool,
-        startQuiz
+        startQuiz,
+        modeMastered(q.mode)
       );
       panel.insertAdjacentHTML(
         'afterbegin',
@@ -539,7 +571,7 @@
         q.questions.length +
         '</div>' +
         '<p class="meta">' +
-        masteredHint(pool) +
+        masteredHint(pool, modeMastered(q.mode)) +
         '</p>' +
         (q.wrong.length > 0
           ? '<div class="wrong-list"><h3>틀린 단어</h3><ul>' + wrongList + '</ul></div>'
@@ -598,7 +630,7 @@
       ' / ' +
       q.questions.length +
       ' · ' +
-      masteredHint(pool) +
+      masteredHint(pool, modeMastered(q.mode)) +
       '</p>' +
       (hanziMode
         ? '<p class="quiz-ko">' +
@@ -632,7 +664,9 @@
         if (isCorrect) q.score++;
         else q.wrong.push(w);
         recordResult(w.id, isCorrect);
+        recordMode(q.mode, w.id, isCorrect);
         render();
+        checkDayComplete();
       });
     });
     var next = document.getElementById('quiz-next');
@@ -665,7 +699,8 @@
           t.score = 0;
           t.wrong = [];
           render();
-        }
+        },
+        modeMastered('tone')
       );
       return;
     }
@@ -695,7 +730,7 @@
         t.items.length +
         '</div>' +
         '<p class="meta">' +
-        masteredHint(pool) +
+        masteredHint(pool, modeMastered('tone')) +
         '</p>' +
         (t.wrong.length > 0
           ? '<div class="wrong-list"><h3>틀린 단어</h3><ul>' + wrongList + '</ul></div>'
@@ -792,7 +827,7 @@
       ' / ' +
       t.items.length +
       ' · ' +
-      masteredHint(pool) +
+      masteredHint(pool, modeMastered('tone')) +
       '</p>' +
       '<p class="quiz-ko">' +
       esc(w.ko) +
@@ -840,7 +875,9 @@
         if (allCorrect) t.score++;
         else t.wrong.push(w);
         recordResult(w.id, allCorrect);
+        recordMode('tone', w.id, allCorrect);
         render();
+        checkDayComplete();
       });
     }
     var next = document.getElementById('tone-next');
@@ -1419,6 +1456,7 @@
       else b.wrong.push(h);
       recordBuild(h, isCorrect);
       render();
+      checkDayComplete();
     }
     var check = document.getElementById('build-check');
     if (check)
@@ -1443,6 +1481,140 @@
         prepareBuildItem();
         render();
       });
+  }
+
+  var PRAISES = [
+    '꾸준함이 실력을 만들어요. 오늘도 해냈어요!',
+    '오늘의 당신, 정말 멋져요! 👏',
+    '한 걸음 한 걸음이 모여 유창함이 돼요. 최고예요!',
+    '와, 네 구역을 전부 정복했어요! 대단해요!',
+    '오늘 외운 단어들이 내일의 자신감이 될 거예요.',
+    '이 정도면 중국어 천재 아닌가요? 🌟',
+    '포기하지 않고 끝까지! 그게 제일 어려운 건데 해냈어요.',
+    '加油！오늘도 정말 잘했어요! 💪',
+    '머릿속에 단어 30개가 새로 이사 왔어요. 축하해요!',
+    '성실함은 배신하지 않아요. 오늘도 멋지게 완주!',
+    '太棒了！(tài bàng le) 정말 최고예요!',
+    '오늘의 노력, 분명히 기억에 오래 남을 거예요.',
+    '병음, 한자, 성조, 조립까지 완벽! 빈틈이 없네요.',
+    '매일 이렇게만 하면 HSK도 문제없어요! 📚',
+    '스스로를 칭찬해 주세요. 오늘 진짜 잘했어요!',
+    '你真厉害！(nǐ zhēn lìhai) 정말 대단해요!',
+    '작은 성취가 쌓여 큰 변화를 만들어요. 오늘도 한 칸 전진!',
+    '오늘의 목표 달성! 맛있는 거 먹을 자격 충분해요 🍜',
+    '공부하는 모습이 정말 빛나요 ✨',
+    '완벽한 하루! 이 기세 그대로 내일도 가 봐요.',
+    '어려운 성조까지 해냈다니, 귀가 점점 트이고 있어요!',
+    '한자 조립 장인 등극! 🧩',
+    '오늘 하루도 나 자신과의 약속을 지켰어요. 멋져요!',
+    '学而时习之 — 배우고 때때로 익히니 기쁘지 아니한가! 오늘 딱 그랬어요.',
+    '벌써 이만큼 왔어요. 처음보다 훨씬 성장했어요!',
+    '이 단어들, 이제 완전히 당신 거예요. 🎁',
+    '꾸준히 하는 사람이 결국 이겨요. 오늘도 승리!',
+    '非常好！(fēicháng hǎo) 아주 훌륭해요!',
+    '오늘 공부 끝! 뿌듯함을 마음껏 즐기세요 😊',
+    '대단한 집중력이었어요. 박수 짝짝짝! 👏👏👏',
+    '중국 여행 가면 오늘 외운 단어가 분명 도와줄 거예요 ✈️'
+  ];
+
+  // 날짜마다 다른 칭찬 (같은 날엔 같은 문구)
+  function todaysPraise() {
+    var d = new Date();
+    var dayNum = Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000);
+    return PRAISES[((dayNum % PRAISES.length) + PRAISES.length) % PRAISES.length];
+  }
+  // 지금 학습 범위(Day)의 네 구역 진행 상황
+  function dayStatus() {
+    var words = getPool();
+    var hz = getBuildPool();
+    var sections = [
+      { key: 'pinyin', done: words.filter(modeMastered('pinyin')).length, total: words.length },
+      { key: 'hanzi', done: words.filter(modeMastered('hanzi')).length, total: words.length },
+      { key: 'tone', done: words.filter(modeMastered('tone')).length, total: words.length },
+      { key: 'build', done: hz.filter(isBuildMastered).length, total: hz.length },
+    ];
+    var complete = sections.every(function (x) {
+      return x.done >= x.total;
+    });
+    return { sections: sections, complete: complete };
+  }
+  function loadDoneDays() {
+    try {
+      return JSON.parse(localStorage.getItem('zh-vocab-day-done-v1') || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function dayProgressHtml() {
+    if (state.day === 'all') return '';
+    var st = dayStatus();
+    var done = loadDoneDays()[state.day];
+    return (
+      '<div class="day-progress-card' +
+      (st.complete ? ' complete' : '') +
+      '"><p class="day-progress-title">' +
+      (st.complete ? '🏆 Day ' + state.day + ' 오늘의 단어 완성!' : '🎯 Day ' + state.day + ' 오늘의 단어 — 네 구역을 모두 외우면 완성') +
+      '</p><div class="day-progress-grid">' +
+      st.sections
+        .map(function (x) {
+          return (
+            '<span class="' +
+            (x.done >= x.total ? 'ok' : '') +
+            '">' +
+            SECTION_NAMES[x.key] +
+            ' <b>' +
+            x.done +
+            '/' +
+            x.total +
+            '</b></span>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      (st.complete && done ? '<p class="hint" style="margin:6px 0 0">' + esc(done) + ' 완성</p>' : '') +
+      '</div>'
+    );
+  }
+  // 답을 기록한 뒤: 이번에 처음으로 네 구역을 다 외웠으면 축하 화면
+  function checkDayComplete() {
+    if (state.day === 'all') return;
+    var doneDays = loadDoneDays();
+    if (doneDays[state.day]) return;
+    var st = dayStatus();
+    if (!st.complete) return;
+    var d = new Date();
+    doneDays[state.day] = d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate();
+    try {
+      localStorage.setItem('zh-vocab-day-done-v1', JSON.stringify(doneDays));
+    } catch (e) {}
+    showCelebration(st);
+  }
+  function showCelebration(st) {
+    var el = document.createElement('div');
+    el.className = 'celebrate';
+    el.innerHTML =
+      '<div class="celebrate-card" role="dialog" aria-modal="true">' +
+      '<div class="celebrate-emoji">🎉</div>' +
+      '<h2>Day ' +
+      state.day +
+      ' 오늘의 단어 완성!</h2>' +
+      '<p class="celebrate-praise">' +
+      esc(todaysPraise()) +
+      '</p>' +
+      '<div class="day-progress-grid">' +
+      st.sections
+        .map(function (x) {
+          return '<span class="ok">' + SECTION_NAMES[x.key] + ' <b>' + x.done + '/' + x.total + '</b></span>';
+        })
+        .join('') +
+      '</div>' +
+      '<button class="btn btn-primary full-width" id="celebrate-close">고마워요! 😊</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('celebrate-close').addEventListener('click', function () {
+      el.remove();
+      render();
+    });
   }
 
   function render() {
