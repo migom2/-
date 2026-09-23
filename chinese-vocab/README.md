@@ -46,3 +46,8 @@ npx serve .
 병음은 반드시 한자 글자 수와 음절 수가 1:1로 맞아야 성조 게임이 올바르게 동작합니다 (예: `认为` → `rèn wéi`).
 
 기본 제공 단어를 추가하거나 수정하려면 `words.js`를 편집하면 됩니다.
+
+## 한자 조립 게임 데이터
+
+- `hanzi-parts.js`: 직접 만든 한자 88자 (부수 + 외우기 이야기)
+- `hanzi-auto.js`: 단어장에 나오는 한자 중 부수 2~3개로 나뉘는 868자. 한자 분해는 [Make Me a Hanzi](https://github.com/skishore/makemeahanzi)의 `dictionary.txt`를 바탕으로 했고, 부수의 한국어 뜻은 직접 붙였어요.

@@ -1004,7 +1004,65 @@
     saveBuildProgress();
   }
   function partLabel(c) {
-    return HANZI_COMPONENTS[c] || '';
+    return HANZI_COMPONENTS[c] || HANZI_AUTO_COMPONENTS[c] || '';
+  }
+  var ALL_COMPONENTS = Object.keys(HANZI_COMPONENTS).concat(
+    Object.keys(HANZI_AUTO_COMPONENTS).filter(function (c) {
+      return !HANZI_COMPONENTS[c];
+    })
+  );
+  // 이야기가 있는 직접 만든 한자 + 단어장에 나오는 한자를 자동으로 나눈 것. 각 한자에 그 한자가 들어간 단어 목록을 붙여요.
+  var ALL_HANZI = (function () {
+    var byChar = {};
+    WORDS.forEach(function (w) {
+      w.hanzi.split('').forEach(function (c) {
+        (byChar[c] = byChar[c] || []).push(w);
+      });
+    });
+    var list = HANZI_PARTS.map(function (h) {
+      return { ch: h.ch, parts: h.parts, py: h.py, ko: h.ko, story: h.story, words: byChar[h.ch] || [] };
+    });
+    HANZI_AUTO.forEach(function (s) {
+      var chars = Array.from(s);
+      var words = byChar[chars[0]] || [];
+      list.push({ ch: chars[0], parts: chars.slice(1), py: charPinyin(words[0], chars[0]), ko: '', story: '', words: words });
+    });
+    return list;
+  })();
+  function charPinyin(w, ch) {
+    if (!w) return '';
+    var sylls = splitPinyin(w.pinyin);
+    return sylls[w.hanzi.indexOf(ch)] || '';
+  }
+  // 학습 범위(Day)에 나오는 한자만. 전체일 때는 모든 한자.
+  function getBuildPool() {
+    if (state.day === 'all') return ALL_HANZI;
+    var inScope = {};
+    getPool().forEach(function (w) {
+      w.hanzi.split('').forEach(function (c) {
+        inScope[c] = true;
+      });
+    });
+    return ALL_HANZI.filter(function (h) {
+      return inScope[h.ch];
+    });
+  }
+  // 문제에 보여줄 단어: 지금 학습 범위의 단어를 우선으로 골라요.
+  function pickContextWord(h) {
+    var scoped = getPool();
+    var inScope = h.words.filter(function (w) {
+      return scoped.indexOf(w) !== -1;
+    });
+    var from = inScope.length ? inScope : h.words;
+    return from.length ? from[Math.floor(Math.random() * from.length)] : null;
+  }
+  function blankedWordHtml(w, ch) {
+    return w.hanzi
+      .split('')
+      .map(function (c) {
+        return c === ch ? '<span class="build-blank">□</span>' : esc(c);
+      })
+      .join('');
   }
   function storyHtml(story) {
     return esc(story).replace(/【(.*?)】/g, '<mark class="story-key">$1</mark>');
@@ -1022,26 +1080,11 @@
       '</b></span>'
     );
   }
-  function exampleWordsHtml(h) {
-    var ex = WORDS.filter(function (w) {
-      return w.hanzi.indexOf(h.ch) !== -1;
-    }).slice(0, 2);
-    if (ex.length === 0) return '';
-    return (
-      '<p class="hint build-ex">이 한자가 들어간 단어: ' +
-      ex
-        .map(function (w) {
-          return '<b class="hanzi">' + esc(w.hanzi) + '</b> ' + esc(w.pinyin) + ' (' + esc(w.ko) + ')';
-        })
-        .join(' · ') +
-      '</p>'
-    );
-  }
   // 정답 조각 + 헷갈리지 않는 오답 조각(뜻이 겹치지 않는 것) 섞기, 총 6~7장
   function buildTiles(h) {
     var labels = h.parts.map(partLabel);
     var others = shuffle(
-      Object.keys(HANZI_COMPONENTS).filter(function (c) {
+      ALL_COMPONENTS.filter(function (c) {
         return h.parts.indexOf(c) === -1 && labels.indexOf(partLabel(c)) === -1;
       })
     );
@@ -1069,22 +1112,28 @@
     b.picked = [];
     b.checked = false;
     b.lastCorrect = null;
-    if (b.index < b.items.length) b.tiles = buildTiles(b.items[b.index]);
+    if (b.index < b.items.length) {
+      b.tiles = buildTiles(b.items[b.index]);
+      b.word = pickContextWord(b.items[b.index]);
+    }
   }
 
   function renderBuild() {
     var panel = document.getElementById('panel');
     var b = state.build;
-    var all = HANZI_PARTS;
+    var all = getBuildPool();
 
     if (b.stage === 'dex') {
+      var stories = ALL_HANZI.filter(function (h) {
+        return h.story;
+      });
       panel.innerHTML =
-        '<h2>📖 한자 도감</h2>' +
-        '<p class="meta">' +
-        masteredHint(all, isBuildMastered, '한자') +
-        ' · 눌러서 이야기 보기</p>' +
+        '<h2>📖 한자 이야기 도감</h2>' +
+        '<p class="meta">이야기가 있는 한자 ' +
+        stories.length +
+        '자 · 눌러서 이야기 보기</p>' +
         '<div class="dex-grid">' +
-        all
+        stories
           .map(function (h) {
             return (
               '<details class="dex-item' +
@@ -1115,12 +1164,12 @@
     if (b.stage === 'setup') {
       renderCountSetup(
         panel,
-        '뜻을 보고 부수를 골라 한자를 맞혀요.',
+        '뜻을 보고 부수를 골라 한자를 맞혀요.' + (state.day === 'all' ? '' : ' (이 Day의 단어에 나오는 한자)'),
         all,
         startBuild,
         isBuildMastered,
         '한자',
-        '<button class="btn btn-ghost full-width" id="open-dex">📖 한자 도감 보기</button>'
+        '<button class="btn btn-ghost full-width" id="open-dex">📖 한자 이야기 도감 보기</button>'
       );
       document.getElementById('open-dex').addEventListener('click', function () {
         b.stage = 'dex';
@@ -1145,7 +1194,7 @@
           ? '<div class="wrong-list"><h3>틀린 한자</h3><ul>' +
             b.wrong
               .map(function (h) {
-                return '<li>' + equationHtml(h) + ' ' + esc(h.ko) + '</li>';
+                return '<li>' + equationHtml(h) + ' ' + esc(h.ko || (h.words[0] ? h.words[0].hanzi + ' ' + h.words[0].ko : '')) + '</li>';
               })
               .join('') +
             '</ul></div>'
@@ -1167,6 +1216,8 @@
     }
 
     var h = b.items[b.index];
+    var w = b.word;
+    var py = w ? charPinyin(w, h.ch) || h.py : h.py;
     var slotsHtml = h.parts
       .map(function (_, i) {
         var ti = b.picked[i];
@@ -1213,11 +1264,10 @@
         '</p>' +
         equationHtml(h) +
         '<p class="build-py">' +
-        esc(h.py) +
-        ' · ' +
-        esc(h.ko) +
+        esc(py) +
+        (h.ko ? ' · ' + esc(h.ko) : '') +
         '</p>' +
-        exampleWordsHtml(h) +
+        (w ? '<p class="build-word-full"><b class="hanzi">' + esc(w.hanzi) + '</b> ' + esc(w.pinyin) + ' · ' + esc(w.ko) + '</p>' : '') +
         '</div>' +
         '<button class="btn btn-primary full-width" id="build-next">다음</button>';
     } else {
@@ -1237,11 +1287,21 @@
       ' · ' +
       masteredHint(all, isBuildMastered, '한자') +
       '</p>' +
-      '<p class="build-prompt">' +
-      esc(h.ko) +
-      ' <span class="build-py-inline">' +
-      esc(h.py) +
-      '</span></p>' +
+      (w
+        ? '<p class="build-word hanzi">' +
+          (b.checked ? esc(w.hanzi) : blankedWordHtml(w, h.ch)) +
+          '</p>' +
+          '<p class="build-prompt">' +
+          (h.ko ? esc(h.ko) + ' · ' : '') +
+          '<span class="build-py-inline">' +
+          esc(py) +
+          '</span></p>' +
+          '<p class="build-word-meaning">' +
+          esc(w.pinyin) +
+          ' · ' +
+          esc(w.ko) +
+          '</p>'
+        : '<p class="build-prompt">' + esc(h.ko) + ' <span class="build-py-inline">' + esc(py) + '</span></p>') +
       '<div class="build-slots">' +
       slotsHtml +
       '<span class="build-plus">=</span><span class="build-target hanzi">' +
