@@ -60,12 +60,76 @@
   }
   function recordResult(id, isCorrect) {
     var entry = state.progress[id] || { status: 'new', correct: 0, wrong: 0 };
+    var correct = (entry.correct || 0) + (isCorrect ? 1 : 0);
+    // 2번 맞히면 외운 단어(암기완료). 이미 외운 단어는 맞히는 동안 그대로 유지.
+    var known = isCorrect && (entry.status === 'known' || correct >= MASTERED_THRESHOLD);
     state.progress[id] = {
-      correct: (entry.correct || 0) + (isCorrect ? 1 : 0),
+      correct: correct,
       wrong: (entry.wrong || 0) + (isCorrect ? 0 : 1),
-      status: isCorrect ? 'known' : 'learning',
+      status: known ? 'known' : 'learning',
     };
     saveProgress();
+  }
+
+  var MASTERED_THRESHOLD = 2;
+  function isMastered(w) {
+    return getEntry(w.id).status === 'known';
+  }
+  function unmasteredOf(pool) {
+    return pool.filter(function (w) {
+      return !isMastered(w);
+    });
+  }
+  function masteredHint(pool) {
+    return '외운 단어 ' + (pool.length - unmasteredOf(pool).length) + ' / ' + pool.length;
+  }
+  // 문제 수 선택 화면 (10문제 · 15문제 · 전체). 외운 단어는 출제하지 않아요.
+  function renderCountSetup(panel, intro, pool, onStart) {
+    var remaining = unmasteredOf(pool);
+    var html = '<div class="empty"><p>' + intro + '</p>' + '<p class="meta" style="margin:0">' + masteredHint(pool) + '</p>';
+    if (pool.length === 0) {
+      html += '<p>이 범위에는 단어가 없어요.</p></div>';
+      panel.innerHTML = html;
+      return;
+    }
+    if (remaining.length === 0) {
+      html +=
+        '<p>🎉 이 범위 단어를 모두 외웠어요!</p>' +
+        '<button class="btn btn-primary full-width" id="count-review-all">외운 단어까지 전체 복습하기</button></div>';
+      panel.innerHTML = html;
+      document.getElementById('count-review-all').addEventListener('click', function () {
+        onStart(shuffle(pool));
+      });
+      return;
+    }
+    var counts = [10, 15].filter(function (n) {
+      return n < remaining.length;
+    });
+    counts.push(remaining.length);
+    html +=
+      '<p class="hint" style="margin:0">몇 문제를 풀어볼까요? (아직 못 외운 ' +
+      remaining.length +
+      '개 중에서 출제)</p>' +
+      '<div class="setup-row" style="width:100%">' +
+      counts
+        .map(function (n) {
+          return (
+            '<button class="btn btn-primary" data-count="' +
+            n +
+            '">' +
+            (n === remaining.length ? '전체 (' + n + ')' : n + '문제') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div></div>';
+    panel.innerHTML = html;
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-count]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var n = parseInt(btn.getAttribute('data-count'), 10);
+        onStart(shuffle(remaining).slice(0, n));
+      });
+    });
   }
   function resetProgress() {
     state.progress = {};
@@ -340,9 +404,9 @@
   }
 
   // ---------------- 병음 퀴즈 (뜻+한자 → 병음 객관식) ----------------
-  function buildQuizQuestions() {
+  function buildQuizQuestions(words) {
     var pool = getPool();
-    return shuffle(pool).map(function (w) {
+    return words.map(function (w) {
       var others = pool.filter(function (x) {
         return x.id !== w.id && x.pinyin !== w.pinyin;
       });
@@ -359,29 +423,19 @@
     var pool = getPool();
     var q = state.quiz;
 
+    function startQuiz(words) {
+      q.stage = 'active';
+      q.count = words.length;
+      q.questions = buildQuizQuestions(words);
+      q.index = 0;
+      q.selected = null;
+      q.score = 0;
+      q.wrong = [];
+      render();
+    }
+
     if (q.stage === 'setup') {
-      panel.innerHTML =
-        '<div class="empty">' +
-        '<p>뜻과 한자를 보고 알맞은 병음을 고르는 퀴즈예요.</p>' +
-        '<p class="meta" style="margin:0">문제 수: ' +
-        pool.length +
-        '개</p>' +
-        (pool.length === 0
-          ? '<p>이 범위에는 단어가 없어요.</p>'
-          : '<button class="btn btn-primary full-width" id="quiz-start">퀴즈 시작</button>') +
-        '</div>';
-      var start = document.getElementById('quiz-start');
-      if (start) {
-        start.addEventListener('click', function () {
-          q.stage = 'active';
-          q.questions = buildQuizQuestions();
-          q.index = 0;
-          q.selected = null;
-          q.score = 0;
-          q.wrong = [];
-          render();
-        });
-      }
+      renderCountSetup(panel, '뜻과 한자를 보고 알맞은 병음을 고르는 퀴즈예요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.', pool, startQuiz);
       return;
     }
 
@@ -409,12 +463,15 @@
         ' / ' +
         q.questions.length +
         '</div>' +
+        '<p class="meta">' +
+        masteredHint(pool) +
+        '</p>' +
         (q.wrong.length > 0
           ? '<div class="wrong-list"><h3>틀린 단어</h3><ul>' + wrongList + '</ul></div>'
           : '<p class="hint" style="text-align:center">🎉 전부 맞혔어요!</p>') +
         '<div class="setup-row">' +
         (q.wrong.length > 0 ? '<button class="btn btn-bad" id="retry-wrong">틀린 것만 다시</button>' : '') +
-        '<button class="btn btn-primary" id="retry-all">전체 다시 풀기</button>' +
+        '<button class="btn btn-primary" id="retry-all">새 문제 풀기</button>' +
         '</div>';
       var retryWrong = document.getElementById('retry-wrong');
       if (retryWrong) {
@@ -425,16 +482,7 @@
           var wrongWords = pool.filter(function (w) {
             return wrongIds.indexOf(w.id) !== -1;
           });
-          q.questions = shuffle(wrongWords).map(function (w) {
-            var others = pool.filter(function (x) {
-              return x.id !== w.id && x.pinyin !== w.pinyin;
-            });
-            var distractors = shuffle(others).slice(0, 4);
-            var options = shuffle(distractors.concat([w])).map(function (x) {
-              return x.pinyin;
-            });
-            return { word: w, options: options };
-          });
+          q.questions = buildQuizQuestions(shuffle(wrongWords));
           q.stage = 'active';
           q.index = 0;
           q.selected = null;
@@ -446,12 +494,7 @@
       var retryAll = document.getElementById('retry-all');
       if (retryAll) {
         retryAll.addEventListener('click', function () {
-          q.questions = buildQuizQuestions();
-          q.stage = 'active';
-          q.index = 0;
-          q.selected = null;
-          q.score = 0;
-          q.wrong = [];
+          q.stage = 'setup';
           render();
         });
       }
@@ -476,6 +519,8 @@
       (q.index + 1) +
       ' / ' +
       q.questions.length +
+      ' · ' +
+      masteredHint(pool) +
       '</p>' +
       '<p class="quiz-ko">' +
       esc(w.ko) +
@@ -519,29 +564,21 @@
     var t = state.tone;
 
     if (t.stage === 'setup') {
-      panel.innerHTML =
-        '<div class="empty">' +
-        '<p>뜻과 한자를 보고 병음의 성조를 맞히는 게임이에요. 음절마다 1~4성 또는 경성을 골라보세요.</p>' +
-        '<p class="meta" style="margin:0">문제 수: ' +
-        pool.length +
-        '개</p>' +
-        (pool.length === 0
-          ? '<p>이 범위에는 단어가 없어요.</p>'
-          : '<button class="btn btn-primary full-width" id="tone-start">게임 시작</button>') +
-        '</div>';
-      var start = document.getElementById('tone-start');
-      if (start) {
-        start.addEventListener('click', function () {
+      renderCountSetup(
+        panel,
+        '뜻과 한자를 보고 병음의 성조를 맞히는 게임이에요. 음절마다 1~4성 또는 경성을 골라보세요. 2번 맞힌 단어는 외운 단어가 되어 더 이상 나오지 않아요.',
+        pool,
+        function (words) {
           t.stage = 'active';
-          t.items = shuffle(pool);
+          t.items = words;
           t.index = 0;
           t.answers = [];
           t.checked = false;
           t.score = 0;
           t.wrong = [];
           render();
-        });
-      }
+        }
+      );
       return;
     }
 
@@ -569,12 +606,15 @@
         ' / ' +
         t.items.length +
         '</div>' +
+        '<p class="meta">' +
+        masteredHint(pool) +
+        '</p>' +
         (t.wrong.length > 0
           ? '<div class="wrong-list"><h3>틀린 단어</h3><ul>' + wrongList + '</ul></div>'
           : '<p class="hint" style="text-align:center">🎉 성조를 전부 맞혔어요!</p>') +
         '<div class="setup-row">' +
         (t.wrong.length > 0 ? '<button class="btn btn-bad" id="tone-retry-wrong">틀린 것만 다시</button>' : '') +
-        '<button class="btn btn-primary" id="tone-retry-all">전체 다시 하기</button>' +
+        '<button class="btn btn-primary" id="tone-retry-all">새 문제 풀기</button>' +
         '</div>';
       var retryWrong = document.getElementById('tone-retry-wrong');
       if (retryWrong) {
@@ -592,13 +632,7 @@
       var retryAll = document.getElementById('tone-retry-all');
       if (retryAll) {
         retryAll.addEventListener('click', function () {
-          t.items = shuffle(pool);
-          t.stage = 'active';
-          t.index = 0;
-          t.answers = [];
-          t.checked = false;
-          t.score = 0;
-          t.wrong = [];
+          t.stage = 'setup';
           render();
         });
       }
@@ -669,6 +703,8 @@
       (t.index + 1) +
       ' / ' +
       t.items.length +
+      ' · ' +
+      masteredHint(pool) +
       '</p>' +
       '<p class="quiz-ko">' +
       esc(w.ko) +
