@@ -35,6 +35,21 @@
     });
   }
 
+  // 마지막으로 고른 학습 범위(Day)를 기억해요. 다시 열면 전체가 아니라 그 Day로 시작.
+  function loadDay() {
+    try {
+      var v = localStorage.getItem('zh-vocab-day');
+      return v && v !== 'all' ? parseInt(v, 10) || 'all' : 'all';
+    } catch (e) {
+      return 'all';
+    }
+  }
+  function saveDay() {
+    try {
+      localStorage.setItem('zh-vocab-day', String(state.day));
+    } catch (e) {}
+  }
+
   function loadProgress() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -91,7 +106,9 @@
       '<div class="empty"><p>' +
       intro +
       '</p>' +
-      '<p class="meta" style="margin:0">' +
+      '<p class="meta" style="margin:0">📅 ' +
+      (state.day === 'all' ? '전체 (Day 1~' + TOTAL_DAYS + ')' : 'Day ' + state.day) +
+      ' · ' +
       masteredHint(pool, masteredFn, noun) +
       '</p>';
     if (pool.length === 0) {
@@ -164,7 +181,7 @@
   }
 
   var state = {
-    day: 'all',
+    day: loadDay(),
     tab: 'cards',
     progress: loadProgress(),
     cardFilter: 'all',
@@ -230,9 +247,11 @@
       sel.addEventListener('change', function (e) {
         var v = e.target.value;
         state.day = v === 'all' ? 'all' : parseInt(v, 10);
+        saveDay();
         buildDeck();
         resetQuiz();
         resetTone();
+        state.build = { stage: 'setup', items: [], index: 0, tiles: [], picked: [], checked: false, score: 0, wrong: [] };
         render();
       });
     }
