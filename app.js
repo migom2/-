@@ -516,9 +516,11 @@
 
   var IDK_OPTION = '모르겠어요';
 
+  // 오답 보기는 같은 학습 범위의 단어(이미 외운 단어 포함)에서 가져와요. 남은 단어가 적어도 퀴즈를 만들 수 있게.
   function buildQuestionsFromWords(words, mode, preserveOrder) {
     mode = mode === 'ko2en' ? 'ko2en' : 'en2ko';
-    var distractorPool = words.length > 4 ? words : WORDS;
+    var scope = getPool();
+    var distractorPool = scope.length > 4 ? scope : WORDS;
     var keyFn =
       mode === 'ko2en'
         ? function (w) {
@@ -597,18 +599,6 @@
           };
           render();
         });
-        return;
-      }
-
-      if (remaining.length < 4) {
-        panel.innerHTML =
-          '<h2>퀴즈 시작하기</h2>' +
-          '<div class="empty"><p>암기 안 된 단어가 ' +
-          remaining.length +
-          '개뿐이라 퀴즈를 만들 수 없어요. (최소 4개 필요)</p>' +
-          '<p class="hint">' +
-          progressHint +
-          '</p></div>';
         return;
       }
 
