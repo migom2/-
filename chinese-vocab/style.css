@@ -1105,3 +1105,29 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .celebrate-card, .celebrate-emoji { animation: none; }
 }
+.storage-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.backup-card .setup-row {
+  margin: 8px 0;
+}
+.backup-text {
+  width: 100%;
+  min-height: 70px;
+  font: inherit;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  word-break: break-all;
+}

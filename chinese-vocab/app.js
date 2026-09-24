@@ -108,16 +108,26 @@
     var e = mastery[mode][id] || { correct: 0, wrong: 0, status: 'new' };
     var correct = (e.correct || 0) + (isCorrect ? 1 : 0);
     var known = isCorrect && (e.status === 'known' || correct >= MASTERED_THRESHOLD);
-    mastery[mode][id] = { correct: correct, wrong: (e.wrong || 0) + (isCorrect ? 0 : 1), status: known ? 'known' : 'learning' };
+    mastery[mode][id] = {
+      correct: correct,
+      wrong: (e.wrong || 0) + (isCorrect ? 0 : 1),
+      status: known ? 'known' : 'learning',
+      lastCorrect: isCorrect,
+    };
     try {
       localStorage.setItem('zh-vocab-mastery-v1', JSON.stringify(mastery));
     } catch (err) {}
   }
   function modeMastered(mode) {
-    return function (w) {
+    var fn = function (w) {
       var e = mastery[mode][w.id];
       return !!e && e.status === 'known';
     };
+    fn.partial = function (w) {
+      var e = mastery[mode][w.id];
+      return !!e && e.status === 'learning' && e.lastCorrect === true;
+    };
+    return fn;
   }
 
   function unmasteredOf(pool, masteredFn) {
@@ -126,8 +136,16 @@
       return !fn(w);
     });
   }
+  // "외운 단어 2 / 30 · 1번 맞힘 8" — 한 번만 맞힌 것도 보여줘서 기록이 쌓이는 게 보이게
   function masteredHint(pool, masteredFn, noun) {
-    return '외운 ' + (noun || '단어') + ' ' + (pool.length - unmasteredOf(pool, masteredFn).length) + ' / ' + pool.length;
+    var text = '외운 ' + (noun || '단어') + ' ' + (pool.length - unmasteredOf(pool, masteredFn).length) + ' / ' + pool.length;
+    if (masteredFn && masteredFn.partial) {
+      var half = pool.filter(function (w) {
+        return !masteredFn(w) && masteredFn.partial(w);
+      }).length;
+      if (half > 0) text += ' · 1번 맞힘 ' + half;
+    }
+    return text;
   }
   // 문제 수 선택 화면 (10문제 · 15문제 · 전체). 외운 단어는 출제하지 않아요.
   function renderCountSetup(panel, intro, pool, onStart, masteredFn, noun, extraHtml) {
@@ -1089,7 +1107,94 @@
       '</div></div>' +
       '<div class="quiz-stat"><h3>Day별 암기 완료율</h3><div class="day-progress-list">' +
       dayRows +
-      '</div></div>';
+      '</div></div>' +
+      backupHtml();
+    bindBackup();
+  }
+
+  // ---------------- 기록 백업 / 불러오기 ----------------
+  // 기록은 이 브라우저에만 저장돼요. 다른 브라우저·기기로 옮기거나, 지워질 때를 대비해 코드로 백업해요.
+  function exportCode() {
+    var data = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('zh-') === 0) data[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    return 'ZHV1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function importCode(code) {
+    var raw = String(code || '').trim();
+    if (raw.indexOf('ZHV1:') !== 0) throw new Error('bad');
+    var data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(5)))));
+    Object.keys(data).forEach(function (k) {
+      if (k.indexOf('zh-') === 0 && typeof data[k] === 'string') localStorage.setItem(k, data[k]);
+    });
+  }
+  function backupHtml() {
+    return (
+      '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
+      '<p class="hint">외운 기록은 지금 쓰는 브라우저에만 저장돼요. 다른 폰·브라우저로 옮기거나 기록이 지워질 때를 대비해 백업 코드를 저장해 두세요.</p>' +
+      '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button></div>' +
+      '<textarea class="backup-text" id="backup-text" placeholder="여기에 백업 코드를 붙여넣고 불러오기를 누르세요"></textarea>' +
+      '<div class="setup-row"><button class="btn btn-ghost" id="backup-load">붙여넣은 코드 불러오기</button></div>' +
+      '<p class="hint" id="backup-msg"></p></div>'
+    );
+  }
+  function bindBackup() {
+    var msg = document.getElementById('backup-msg');
+    var ta = document.getElementById('backup-text');
+    document.getElementById('backup-copy').addEventListener('click', function () {
+      var code = exportCode();
+      ta.value = code;
+      ta.select();
+      var done = function () {
+        msg.textContent = '✅ 복사했어요! 메모장이나 카톡 나와의 채팅에 붙여넣어 보관하세요.';
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done, function () {
+          msg.textContent = '아래 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
+        });
+      } else {
+        msg.textContent = '아래 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
+      }
+    });
+    document.getElementById('backup-load').addEventListener('click', function () {
+      try {
+        importCode(ta.value);
+        msg.textContent = '✅ 불러왔어요! 새로고침할게요.';
+        setTimeout(function () {
+          location.reload();
+        }, 600);
+      } catch (e) {
+        msg.textContent = '⚠️ 코드가 올바르지 않아요. "ZHV1:"로 시작하는 코드 전체를 붙여넣어 주세요.';
+      }
+    });
+  }
+
+  // 카카오톡·인스타 등 앱 안 브라우저나 시크릿 모드에서는 기록이 지워질 수 있어서 안내해요.
+  function storageNotice() {
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    } catch (e) {}
+    var ua = navigator.userAgent || '';
+    var inApp = /KAKAOTALK|Instagram|FBAN|FBAV|NAVER|Line\/|DaumApps|everytimeApp/i.test(ua);
+    var ok = true;
+    try {
+      localStorage.setItem('zh-test', '1');
+      localStorage.removeItem('zh-test');
+    } catch (e) {
+      ok = false;
+    }
+    if (!inApp && ok) return;
+    var el = document.createElement('div');
+    el.className = 'storage-notice';
+    el.textContent = !ok
+      ? '⚠️ 이 브라우저(시크릿 모드 등)에서는 외운 기록이 저장되지 않아요. 일반 모드의 사파리·크롬으로 열어 주세요.'
+      : '⚠️ 앱 안 브라우저에서는 외운 기록이 지워질 수 있어요. 오른쪽 위 메뉴에서 "다른 브라우저로 열기"(사파리·크롬)로 열어 주세요.';
+    var wrap = document.querySelector('.wrap');
+    wrap.insertBefore(el, wrap.firstChild.nextSibling);
   }
 
 
@@ -1115,6 +1220,10 @@
     var e = state.buildProgress[h.ch];
     return !!e && e.status === 'known';
   }
+  isBuildMastered.partial = function (h) {
+    var e = state.buildProgress[h.ch];
+    return !!e && e.status === 'learning' && (e.correct || 0) > 0;
+  };
   function recordBuild(h, isCorrect) {
     var e = state.buildProgress[h.ch] || { correct: 0, wrong: 0, status: 'new' };
     var correct = (e.correct || 0) + (isCorrect ? 1 : 0);
@@ -1628,5 +1737,6 @@
     else if (state.tab === 'stats') renderStats();
   }
 
+  storageNotice();
   render();
 })();
