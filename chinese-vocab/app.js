@@ -1169,6 +1169,9 @@
     document.getElementById('backup-copy').addEventListener('click', function () {
       var code = exportCode();
       out.value = code;
+      // 코드 전체가 한눈에 보이게 칸을 늘려요 (일부만 복사되는 것 방지)
+      out.style.height = 'auto';
+      out.style.height = out.scrollHeight + 4 + 'px';
       out.select();
       var fallback = function () {
         copyMsg.textContent = '위 코드를 길게 눌러 전체 선택 후 복사해 주세요.';

@@ -1575,6 +1575,40 @@
     });
     if (n === 0) throw new Error('empty');
   }
+  // 코드 앞부분이 잘려서 통째로 못 읽을 때: 남아 있는 조각에서 단어 기록("번호":{correct,wrong,status})만 건져요.
+  function salvageProgress(code) {
+    var at = String(code || '').indexOf('ENV1:');
+    var body = (at !== -1 ? String(code).slice(at + 5) : String(code || '')).replace(/[^A-Za-z0-9+/]/g, '');
+    var best = {};
+    var bestN = 0;
+    for (var d = 0; d < 4; d++) {
+      var t = body.slice(d);
+      t = t.slice(0, t.length - (t.length % 4));
+      var text = '';
+      try {
+        var bin = atob(t);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      } catch (e) {
+        continue;
+      }
+      var found = {};
+      var n = 0;
+      var re = /\\?"(\d+)\\?":\{\\?"correct\\?":(\d+),\\?"wrong\\?":(\d+),\\?"status\\?":\\?"(new|learning|known)\\?"\}/g;
+      var m;
+      while ((m = re.exec(text))) {
+        found[m[1]] = { correct: +m[2], wrong: +m[3], status: m[4] };
+        n++;
+      }
+      if (n > bestN) {
+        best = found;
+        bestN = n;
+      }
+    }
+    return { entries: best, count: bestN };
+  }
+
   function backupHtml() {
     return (
       '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
@@ -1597,6 +1631,9 @@
     document.getElementById('backup-copy').addEventListener('click', function () {
       var code = exportCode();
       out.value = code;
+      // 코드 전체가 한눈에 보이게 칸을 늘려요 (일부만 복사되는 것 방지)
+      out.style.height = 'auto';
+      out.style.height = out.scrollHeight + 4 + 'px';
       out.select();
       var fallback = function () {
         copyMsg.textContent = '위 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
@@ -1617,6 +1654,28 @@
           location.reload();
         }, 600);
       } catch (e) {
+        if (e.message === 'bad') {
+          var rescued = salvageProgress(ta.value);
+          if (rescued.count > 0) {
+            var ok = confirm(
+              '코드 앞부분이 잘려 있어서 전체를 읽을 수 없어요.\n남아 있는 부분에서 단어 ' +
+                rescued.count +
+                '개의 기록을 찾았어요. 이것만이라도 불러올까요?\n(지금 기록은 지워지지 않고 합쳐져요)'
+            );
+            if (ok) {
+              Object.keys(rescued.entries).forEach(function (id) {
+                state.progress[id] = rescued.entries[id];
+              });
+              saveProgress();
+              render();
+              alert('✅ 단어 ' + rescued.count + '개 기록을 불러왔어요.');
+              return;
+            }
+            msg.textContent =
+              '⚠️ 코드 앞부분이 잘렸어요. 백업 코드는 "ENV1:"로 시작해요. 처음부터 끝까지 전부 복사해서 붙여넣어 주세요.';
+            return;
+          }
+        }
         msg.textContent =
           e.message === 'other'
             ? '⚠️ 중국어 단어장의 백업 코드예요. 중국어 단어장 사이트의 통계 탭에서 불러와 주세요.'
