@@ -899,3 +899,19 @@ h2 {
     transition: none;
   }
 }
+.backup-card .setup-row {
+  margin: 8px 0;
+}
+.backup-text {
+  width: 100%;
+  min-height: 70px;
+  font: inherit;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  word-break: break-all;
+}

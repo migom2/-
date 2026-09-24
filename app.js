@@ -1535,7 +1535,70 @@
       '<div class="quiz-stat"><h3>Day별 암기 완료율</h3><div class="day-progress-list">' +
       dayRows +
       '</div></div>' +
-      customStatsHtml;
+      customStatsHtml +
+      backupHtml();
+    bindBackup();
+  }
+
+  // ---------------- 기록 백업 / 불러오기 ----------------
+  // 기록은 이 브라우저에만 저장돼요. 카톡 안 브라우저 ↔ 사파리·크롬처럼 다른 브라우저로 옮길 때 코드로 옮겨요.
+  function exportCode() {
+    var data = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('vocab-') === 0) data[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    return 'ENV1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  function importCode(code) {
+    var raw = String(code || '').trim();
+    if (raw.indexOf('ENV1:') !== 0) throw new Error('bad');
+    var data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(5)))));
+    Object.keys(data).forEach(function (k) {
+      if (k.indexOf('vocab-') === 0 && typeof data[k] === 'string') localStorage.setItem(k, data[k]);
+    });
+  }
+  function backupHtml() {
+    return (
+      '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
+      '<p class="hint">외운 기록은 지금 쓰는 브라우저에만 저장돼요. 다른 폰·브라우저로 옮기거나 기록이 지워질 때를 대비해 백업 코드를 저장해 두세요.</p>' +
+      '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button></div>' +
+      '<textarea class="backup-text" id="backup-text" placeholder="여기에 백업 코드를 붙여넣고 불러오기를 누르세요"></textarea>' +
+      '<div class="setup-row"><button class="btn btn-ghost" id="backup-load">붙여넣은 코드 불러오기</button></div>' +
+      '<p class="hint" id="backup-msg"></p></div>'
+    );
+  }
+  function bindBackup() {
+    var msg = document.getElementById('backup-msg');
+    var ta = document.getElementById('backup-text');
+    document.getElementById('backup-copy').addEventListener('click', function () {
+      var code = exportCode();
+      ta.value = code;
+      ta.select();
+      var fallback = function () {
+        msg.textContent = '아래 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () {
+          msg.textContent = '✅ 복사했어요! 메모장이나 카톡 나와의 채팅에 붙여넣어 보관하세요.';
+        }, fallback);
+      } else {
+        fallback();
+      }
+    });
+    document.getElementById('backup-load').addEventListener('click', function () {
+      try {
+        importCode(ta.value);
+        msg.textContent = '✅ 불러왔어요! 새로고침할게요.';
+        setTimeout(function () {
+          location.reload();
+        }, 600);
+      } catch (e) {
+        msg.textContent = '⚠️ 코드가 올바르지 않아요. "ENV1:"로 시작하는 코드 전체를 붙여넣어 주세요.';
+      }
+    });
   }
 
   function render() {
