@@ -1552,37 +1552,58 @@
     } catch (e) {}
     return 'ENV1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
   }
+  // 붙여넣을 때 줄바꿈·공백·앞뒤 글자가 섞이거나 앞부분("ENV1:")이 빠져도 읽을 수 있게 너그럽게 처리
   function importCode(code) {
-    var raw = String(code || '').trim();
-    if (raw.indexOf('ENV1:') !== 0) throw new Error('bad');
-    var data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(5)))));
+    var text = String(code || '');
+    if (text.indexOf('ZHV1:') !== -1 && text.indexOf('ENV1:') === -1) throw new Error('other');
+    var at = text.indexOf('ENV1:');
+    var body = at !== -1 ? (text.slice(at + 5).match(/^[\sA-Za-z0-9+/=]*/) || [''])[0] : text;
+    body = body.replace(/[^A-Za-z0-9+/=]/g, '').replace(/=+(?=[A-Za-z0-9+/])/g, '');
+    var data;
+    try {
+      data = JSON.parse(decodeURIComponent(escape(atob(body))));
+    } catch (e) {
+      throw new Error('bad');
+    }
+    if (!data || typeof data !== 'object') throw new Error('bad');
+    var n = 0;
     Object.keys(data).forEach(function (k) {
-      if (k.indexOf('vocab-') === 0 && typeof data[k] === 'string') localStorage.setItem(k, data[k]);
+      if (k.indexOf('vocab-') === 0 && typeof data[k] === 'string') {
+        localStorage.setItem(k, data[k]);
+        n++;
+      }
     });
+    if (n === 0) throw new Error('empty');
   }
   function backupHtml() {
     return (
       '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
       '<p class="hint">외운 기록은 지금 쓰는 브라우저에만 저장돼요. 다른 폰·브라우저로 옮기거나 기록이 지워질 때를 대비해 백업 코드를 저장해 두세요.</p>' +
+      '<p class="backup-step">① 기록이 <b>있는</b> 브라우저에서</p>' +
       '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button></div>' +
-      '<textarea class="backup-text" id="backup-text" placeholder="여기에 백업 코드를 붙여넣고 불러오기를 누르세요"></textarea>' +
+      '<textarea class="backup-text" id="backup-out" readonly placeholder="여기에 이 브라우저의 백업 코드가 나와요"></textarea>' +
+      '<p class="hint" id="backup-copy-msg"></p>' +
+      '<p class="backup-step">② 기록을 <b>옮길</b> 브라우저에서</p>' +
+      '<textarea class="backup-text" id="backup-text" placeholder="복사한 백업 코드를 여기에 붙여넣으세요"></textarea>' +
       '<div class="setup-row"><button class="btn btn-ghost" id="backup-load">붙여넣은 코드 불러오기</button></div>' +
       '<p class="hint" id="backup-msg"></p></div>'
     );
   }
   function bindBackup() {
+    var copyMsg = document.getElementById('backup-copy-msg');
     var msg = document.getElementById('backup-msg');
+    var out = document.getElementById('backup-out');
     var ta = document.getElementById('backup-text');
     document.getElementById('backup-copy').addEventListener('click', function () {
       var code = exportCode();
-      ta.value = code;
-      ta.select();
+      out.value = code;
+      out.select();
       var fallback = function () {
-        msg.textContent = '아래 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
+        copyMsg.textContent = '위 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(code).then(function () {
-          msg.textContent = '✅ 복사했어요! 메모장이나 카톡 나와의 채팅에 붙여넣어 보관하세요.';
+          copyMsg.textContent = '✅ 복사했어요! 옮길 브라우저에서 이 사이트를 열고 ② 칸에 붙여넣으세요.';
         }, fallback);
       } else {
         fallback();
@@ -1596,10 +1617,16 @@
           location.reload();
         }, 600);
       } catch (e) {
-        msg.textContent = '⚠️ 코드가 올바르지 않아요. "ENV1:"로 시작하는 코드 전체를 붙여넣어 주세요.';
+        msg.textContent =
+          e.message === 'other'
+            ? '⚠️ 중국어 단어장의 백업 코드예요. 중국어 단어장 사이트의 통계 탭에서 불러와 주세요.'
+            : e.message === 'empty'
+            ? '⚠️ 이 코드에는 저장된 기록이 없어요. 기록이 있는 브라우저에서 다시 복사해 주세요.'
+            : '⚠️ 코드를 읽지 못했어요. 복사한 코드 전체를 빠짐없이 붙여넣어 주세요.';
       }
     });
   }
+
 
   function render() {
     var active = document.activeElement;

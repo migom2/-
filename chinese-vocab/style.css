@@ -1131,3 +1131,8 @@ h2 {
   color: var(--ink);
   word-break: break-all;
 }
+.backup-step {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
