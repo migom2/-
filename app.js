@@ -1604,12 +1604,16 @@
       '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
       '<p class="hint">외운 기록은 지금 쓰는 브라우저에만 저장돼요. 다른 폰·브라우저로 옮기거나 기록이 지워질 때를 대비해 백업 코드를 저장해 두세요.</p>' +
       '<p class="backup-step">① 기록이 <b>있는</b> 브라우저에서</p>' +
-      '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button></div>' +
+      '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button>' +
+      (navigator.share ? '<button class="btn btn-ghost" id="backup-share">📤 메모·카톡으로 보내기</button>' : '') +
+      '</div>' +
       '<textarea class="backup-text" id="backup-out" readonly placeholder="여기에 이 브라우저의 백업 코드가 나와요"></textarea>' +
       '<p class="hint" id="backup-copy-msg"></p>' +
       '<p class="backup-step">② 기록을 <b>옮길</b> 브라우저에서</p>' +
       '<textarea class="backup-text" id="backup-text" placeholder="복사한 백업 코드를 여기에 붙여넣으세요"></textarea>' +
-      '<div class="setup-row"><button class="btn btn-ghost" id="backup-load">붙여넣은 코드 불러오기</button></div>' +
+      '<div class="setup-row">' +
+      (navigator.clipboard && navigator.clipboard.readText ? '<button class="btn btn-ghost" id="backup-paste">📋 복사한 코드 붙여넣기</button>' : '') +
+      '<button class="btn btn-primary" id="backup-load">불러오기</button></div>' +
       '<p class="hint" id="backup-msg"></p></div>'
     );
   }
@@ -1636,6 +1640,33 @@
         fallback();
       }
     });
+    // 공유 시트로 코드 전체를 한 번에 보내요 (길게 눌러 선택하다 일부만 복사되는 것 방지)
+    var shareBtn = document.getElementById('backup-share');
+    if (shareBtn)
+      shareBtn.addEventListener('click', function () {
+        var code = exportCode();
+        out.value = code;
+        navigator.share({ text: code }).then(
+          function () {
+            copyMsg.textContent = '✅ 보냈어요! 메모나 카톡에 코드가 통째로 저장됐어요.';
+          },
+          function () {}
+        );
+      });
+    // 클립보드에 있는 코드를 통째로 붙여넣어요
+    var pasteBtn = document.getElementById('backup-paste');
+    if (pasteBtn)
+      pasteBtn.addEventListener('click', function () {
+        navigator.clipboard.readText().then(
+          function (t) {
+            ta.value = t;
+            msg.textContent = t.indexOf('ENV1:') === -1 ? '⚠️ 붙여넣은 내용이 ENV1:로 시작하지 않아요. 코드 앞부분이 잘렸을 수 있어요.' : '붙여넣었어요. 불러오기를 누르세요.';
+          },
+          function () {
+            msg.textContent = '붙여넣기 권한이 없어요. 칸을 길게 눌러 직접 붙여넣어 주세요.';
+          }
+        );
+      });
     document.getElementById('backup-load').addEventListener('click', function () {
       try {
         importCode(ta.value);
@@ -1671,7 +1702,9 @@
             ? '⚠️ 중국어 단어장의 백업 코드예요. 중국어 단어장 사이트의 통계 탭에서 불러와 주세요.'
             : e.message === 'empty'
             ? '⚠️ 이 코드에는 저장된 기록이 없어요. 기록이 있는 브라우저에서 다시 복사해 주세요.'
-            : '⚠️ 코드를 읽지 못했어요. 복사한 코드 전체를 빠짐없이 붙여넣어 주세요.';
+            : ta.value.indexOf('ENV1:') === -1
+            ? '⚠️ 코드 앞부분이 잘렸어요. 백업 코드는 ENV1:로 시작해요. 기록이 있는 브라우저에서 "📤 보내기"나 "백업 코드 복사"로 다시 가져와 주세요.'
+            : '⚠️ 코드 끝부분이 잘렸어요. 코드 전체를 빠짐없이 붙여넣어 주세요.';
       }
     });
   }
