@@ -145,7 +145,12 @@
     });
   }
   function normalizeAnswer(s) {
-    return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
+    return String(s)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
   }
   function genId() {
     return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
