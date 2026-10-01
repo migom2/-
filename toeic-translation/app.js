@@ -472,13 +472,17 @@
       view = 'practice';
       render();
     } else if (act === 'reset') {
-      if (confirm('레벨, 푼 문제, 단어 기록이 모두 지워져요. 초기화할까요?')) {
-        state = defaultState();
-        attempt = null;
-        save();
-        view = 'practice';
-        render();
+      // 실수로 지우지 않도록 두 번 눌러야 초기화된다
+      if (b.dataset.armed !== '1') {
+        b.dataset.armed = '1';
+        b.textContent = '한 번 더 누르면 모든 기록이 지워져요';
+        return;
       }
+      state = defaultState();
+      attempt = null;
+      save();
+      view = 'practice';
+      render();
     }
   });
 
