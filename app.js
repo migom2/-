@@ -80,8 +80,9 @@
     state.writeProgress[id] = entry;
     saveWriteProgress();
   }
+  var WRITE_MASTERED_THRESHOLD = 1;
   function isWriteMastered(entry, mode) {
-    return (entry[mode].correct || 0) >= MASTERED_THRESHOLD;
+    return (entry[mode].correct || 0) >= WRITE_MASTERED_THRESHOLD;
   }
   function resetWriteProgress() {
     state.writeProgress = {};
