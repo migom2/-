@@ -357,6 +357,20 @@ button.btn {
   word-break: break-word;
 }
 
+.quiz-meaning {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  word-break: break-word;
+}
+
+.option .opt-pinyin {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-left: 6px;
+}
+
 .options {
   display: flex;
   flex-direction: column;

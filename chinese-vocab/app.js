@@ -519,17 +519,15 @@
     }
   }
 
-  // ---------------- 단어 시험 (한자+병음 → 뜻 객관식) ----------------
+  // ---------------- 단어 시험 (뜻 → 한자+병음 객관식) ----------------
   function buildExamQuestions() {
     var pool = getPool();
     return shuffle(pool).map(function (w) {
       var others = pool.filter(function (x) {
-        return x.id !== w.id && x.ko !== w.ko;
+        return x.id !== w.id;
       });
       var distractors = shuffle(others).slice(0, 4);
-      var options = shuffle(distractors.concat([w])).map(function (x) {
-        return x.ko;
-      });
+      var options = shuffle(distractors.concat([w]));
       return { word: w, options: options };
     });
   }
@@ -542,7 +540,7 @@
     if (ex.stage === 'setup') {
       panel.innerHTML =
         '<div class="empty">' +
-        '<p>한자와 병음을 보고 알맞은 뜻을 고르는 단어 시험이에요.</p>' +
+        '<p>뜻을 보고 그 뜻에 맞는 한자·병음을 고르는 단어 시험이에요.</p>' +
         '<p class="meta" style="margin:0">문제 수: ' +
         pool.length +
         '개</p>' +
@@ -607,12 +605,10 @@
           });
           ex.questions = shuffle(wrongWords).map(function (w) {
             var others = pool.filter(function (x) {
-              return x.id !== w.id && x.ko !== w.ko;
+              return x.id !== w.id;
             });
             var distractors = shuffle(others).slice(0, 4);
-            var options = shuffle(distractors.concat([w])).map(function (x) {
-              return x.ko;
-            });
+            var options = shuffle(distractors.concat([w]));
             return { word: w, options: options };
           });
           ex.stage = 'active';
@@ -644,10 +640,22 @@
       .map(function (opt) {
         var cls = 'option';
         if (ex.selected !== null) {
-          if (opt === w.ko) cls += ' correct';
-          else if (opt === ex.selected) cls += ' wrong';
+          if (opt.id === w.id) cls += ' correct';
+          else if (opt.id === ex.selected) cls += ' wrong';
         }
-        return '<button class="' + cls + '" data-opt="' + esc(opt) + '" ' + (ex.selected !== null ? 'disabled' : '') + '>' + esc(opt) + '</button>';
+        return (
+          '<button class="' +
+          cls +
+          '" data-opt="' +
+          opt.id +
+          '" ' +
+          (ex.selected !== null ? 'disabled' : '') +
+          '><b class="hanzi">' +
+          esc(opt.hanzi) +
+          '</b> <span class="opt-pinyin">' +
+          esc(opt.pinyin) +
+          '</span></button>'
+        );
       })
       .join('');
 
@@ -658,12 +666,10 @@
       ex.questions.length +
       '</p>' +
       '<p class="quiz-ko">' +
-      esc(w.pinyin) +
-      ' ' +
       levelBadge(w) +
       '</p>' +
-      '<p class="quiz-hanzi hanzi">' +
-      esc(w.hanzi) +
+      '<p class="quiz-meaning">' +
+      esc(w.ko) +
       '</p>' +
       '<div class="options">' +
       optionsHtml +
@@ -673,9 +679,9 @@
     Array.prototype.forEach.call(panel.querySelectorAll('[data-opt]'), function (btn) {
       btn.addEventListener('click', function () {
         if (ex.selected !== null) return;
-        var opt = btn.getAttribute('data-opt');
-        ex.selected = opt;
-        var isCorrect = opt === w.ko;
+        var optId = parseInt(btn.getAttribute('data-opt'), 10);
+        ex.selected = optId;
+        var isCorrect = optId === w.id;
         if (isCorrect) ex.score++;
         else ex.wrong.push(w);
         recordResult(w.id, isCorrect);
