@@ -97,6 +97,7 @@
     cardIndex: 0,
     cardFlipped: false,
     quiz: { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] },
+    exam: { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] },
     tone: { stage: 'setup', items: [], index: 0, answers: [], checked: false, score: 0, wrong: [] },
     wordQuery: '',
     wordStatus: 'all',
@@ -125,6 +126,9 @@
 
   function resetQuiz() {
     state.quiz = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
+  }
+  function resetExam() {
+    state.exam = { stage: 'setup', questions: [], index: 0, selected: null, score: 0, wrong: [] };
   }
   function resetTone() {
     state.tone = { stage: 'setup', items: [], index: 0, answers: [], checked: false, score: 0, wrong: [] };
@@ -155,6 +159,7 @@
         state.day = v === 'all' ? 'all' : parseInt(v, 10);
         buildDeck();
         resetQuiz();
+        resetExam();
         resetTone();
         render();
       });
@@ -164,6 +169,7 @@
   var TABS = [
     { key: 'cards', label: '📇 플래시카드' },
     { key: 'quiz', label: '📝 병음 퀴즈' },
+    { key: 'exam', label: '📋 단어 시험' },
     { key: 'tone', label: '🎯 성조 게임' },
     { key: 'words', label: '📚 단어장' },
     { key: 'stats', label: '📊 통계' },
@@ -186,6 +192,7 @@
       btn.addEventListener('click', function () {
         state.tab = btn.getAttribute('data-tab');
         if (state.tab === 'quiz') resetQuiz();
+        if (state.tab === 'exam') resetExam();
         if (state.tab === 'tone') resetTone();
         render();
       });
@@ -507,6 +514,179 @@
       next.addEventListener('click', function () {
         q.index++;
         q.selected = null;
+        render();
+      });
+    }
+  }
+
+  // ---------------- 단어 시험 (한자+병음 → 뜻 객관식) ----------------
+  function buildExamQuestions() {
+    var pool = getPool();
+    return shuffle(pool).map(function (w) {
+      var others = pool.filter(function (x) {
+        return x.id !== w.id && x.ko !== w.ko;
+      });
+      var distractors = shuffle(others).slice(0, 4);
+      var options = shuffle(distractors.concat([w])).map(function (x) {
+        return x.ko;
+      });
+      return { word: w, options: options };
+    });
+  }
+
+  function renderExam() {
+    var panel = document.getElementById('panel');
+    var pool = getPool();
+    var ex = state.exam;
+
+    if (ex.stage === 'setup') {
+      panel.innerHTML =
+        '<div class="empty">' +
+        '<p>한자와 병음을 보고 알맞은 뜻을 고르는 단어 시험이에요.</p>' +
+        '<p class="meta" style="margin:0">문제 수: ' +
+        pool.length +
+        '개</p>' +
+        (pool.length === 0
+          ? '<p>이 범위에는 단어가 없어요.</p>'
+          : '<button class="btn btn-primary full-width" id="exam-start">시험 시작</button>') +
+        '</div>';
+      var start = document.getElementById('exam-start');
+      if (start) {
+        start.addEventListener('click', function () {
+          ex.stage = 'active';
+          ex.questions = buildExamQuestions();
+          ex.index = 0;
+          ex.selected = null;
+          ex.score = 0;
+          ex.wrong = [];
+          render();
+        });
+      }
+      return;
+    }
+
+    if (ex.stage === 'active' && ex.index >= ex.questions.length) {
+      ex.stage = 'done';
+    }
+
+    if (ex.stage === 'done') {
+      var wrongList = ex.wrong
+        .map(function (item) {
+          return (
+            '<li><b class="hanzi">' +
+            esc(item.hanzi) +
+            '</b> [' +
+            esc(item.pinyin) +
+            '] ' +
+            esc(item.ko) +
+            '</li>'
+          );
+        })
+        .join('');
+      panel.innerHTML =
+        '<div class="score">' +
+        ex.score +
+        ' / ' +
+        ex.questions.length +
+        '</div>' +
+        (ex.wrong.length > 0
+          ? '<div class="wrong-list"><h3>틀린 단어</h3><ul>' + wrongList + '</ul></div>'
+          : '<p class="hint" style="text-align:center">🎉 전부 맞혔어요!</p>') +
+        '<div class="setup-row">' +
+        (ex.wrong.length > 0 ? '<button class="btn btn-bad" id="exam-retry-wrong">틀린 것만 다시</button>' : '') +
+        '<button class="btn btn-primary" id="exam-retry-all">전체 다시 풀기</button>' +
+        '</div>';
+      var retryWrong = document.getElementById('exam-retry-wrong');
+      if (retryWrong) {
+        retryWrong.addEventListener('click', function () {
+          var wrongIds = ex.wrong.map(function (x) {
+            return x.id;
+          });
+          var wrongWords = pool.filter(function (w) {
+            return wrongIds.indexOf(w.id) !== -1;
+          });
+          ex.questions = shuffle(wrongWords).map(function (w) {
+            var others = pool.filter(function (x) {
+              return x.id !== w.id && x.ko !== w.ko;
+            });
+            var distractors = shuffle(others).slice(0, 4);
+            var options = shuffle(distractors.concat([w])).map(function (x) {
+              return x.ko;
+            });
+            return { word: w, options: options };
+          });
+          ex.stage = 'active';
+          ex.index = 0;
+          ex.selected = null;
+          ex.score = 0;
+          ex.wrong = [];
+          render();
+        });
+      }
+      var retryAll = document.getElementById('exam-retry-all');
+      if (retryAll) {
+        retryAll.addEventListener('click', function () {
+          ex.questions = buildExamQuestions();
+          ex.stage = 'active';
+          ex.index = 0;
+          ex.selected = null;
+          ex.score = 0;
+          ex.wrong = [];
+          render();
+        });
+      }
+      return;
+    }
+
+    var current = ex.questions[ex.index];
+    var w = current.word;
+    var optionsHtml = current.options
+      .map(function (opt) {
+        var cls = 'option';
+        if (ex.selected !== null) {
+          if (opt === w.ko) cls += ' correct';
+          else if (opt === ex.selected) cls += ' wrong';
+        }
+        return '<button class="' + cls + '" data-opt="' + esc(opt) + '" ' + (ex.selected !== null ? 'disabled' : '') + '>' + esc(opt) + '</button>';
+      })
+      .join('');
+
+    panel.innerHTML =
+      '<p class="meta">' +
+      (ex.index + 1) +
+      ' / ' +
+      ex.questions.length +
+      '</p>' +
+      '<p class="quiz-ko">' +
+      esc(w.pinyin) +
+      ' ' +
+      levelBadge(w) +
+      '</p>' +
+      '<p class="quiz-hanzi hanzi">' +
+      esc(w.hanzi) +
+      '</p>' +
+      '<div class="options">' +
+      optionsHtml +
+      '</div>' +
+      (ex.selected !== null ? '<button class="btn btn-primary full-width" id="exam-next">다음</button>' : '');
+
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-opt]'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (ex.selected !== null) return;
+        var opt = btn.getAttribute('data-opt');
+        ex.selected = opt;
+        var isCorrect = opt === w.ko;
+        if (isCorrect) ex.score++;
+        else ex.wrong.push(w);
+        recordResult(w.id, isCorrect);
+        render();
+      });
+    });
+    var next = document.getElementById('exam-next');
+    if (next) {
+      next.addEventListener('click', function () {
+        ex.index++;
+        ex.selected = null;
         render();
       });
     }
@@ -924,6 +1104,7 @@
     renderTabs();
     if (state.tab === 'cards') renderCards();
     else if (state.tab === 'quiz') renderQuiz();
+    else if (state.tab === 'exam') renderExam();
     else if (state.tab === 'tone') renderTone();
     else if (state.tab === 'words') renderWords();
     else if (state.tab === 'stats') renderStats();
