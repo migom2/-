@@ -20,6 +20,11 @@
       // localStorage 사용 불가 시(사생활 보호 모드 등) 조용히 무시
     }
   }
+  // Ask the browser not to evict saved progress when storage runs low.
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {}
+
   function getEntry(id) {
     return state.progress[id] || { status: 'new', correct: 0, wrong: 0 };
   }
@@ -30,10 +35,14 @@
   }
   function recordResult(id, isCorrect) {
     var entry = state.progress[id] || { status: 'new', correct: 0, wrong: 0 };
+    var correct = (entry.correct || 0) + (isCorrect ? 1 : 0);
+    // Once a word is 암기완료 (from a flashcard or enough correct answers) it
+    // stays that way until the learner misses it again.
+    var known = isCorrect && (entry.status === 'known' || correct >= MASTERED_THRESHOLD);
     state.progress[id] = {
-      correct: (entry.correct || 0) + (isCorrect ? 1 : 0),
+      correct: correct,
       wrong: (entry.wrong || 0) + (isCorrect ? 0 : 1),
-      status: isCorrect ? 'known' : 'learning',
+      status: known ? 'known' : 'learning',
     };
     saveProgress();
   }
@@ -282,8 +291,10 @@
   function isWeak(entry) {
     return (entry.wrong || 0) >= WEAK_THRESHOLD;
   }
+  // One definition of 암기완료 everywhere: the saved status, which flashcards
+  // set directly and quizzes set after MASTERED_THRESHOLD correct answers.
   function isMastered(entry) {
-    return (entry.correct || 0) >= MASTERED_THRESHOLD;
+    return entry.status === 'known';
   }
 
   function getPool() {
@@ -555,9 +566,11 @@
 
   var IDK_OPTION = '모르겠어요';
 
+  // 오답 보기는 같은 학습 범위의 단어(이미 외운 단어 포함)에서 가져와요. 남은 단어가 적어도 퀴즈를 만들 수 있게.
   function buildQuestionsFromWords(words, mode, preserveOrder) {
     mode = mode === 'ko2en' ? 'ko2en' : 'en2ko';
-    var distractorPool = words.length > 4 ? words : WORDS;
+    var scope = getPool();
+    var distractorPool = scope.length > 4 ? scope : WORDS;
     var keyFn =
       mode === 'ko2en'
         ? function (w) {
@@ -577,7 +590,7 @@
     });
   }
 
-  // Splits a pool into words already mastered (correct >= threshold, excluded
+  // Splits a pool into words already mastered (status 'known', excluded
   // from quiz) vs. the rest, further separating frequently-missed "important"
   // words so they can be placed at the end of the quiz session.
   function splitQuizPool(pool) {
@@ -636,18 +649,6 @@
           };
           render();
         });
-        return;
-      }
-
-      if (remaining.length < 4) {
-        panel.innerHTML =
-          '<h2>퀴즈 시작하기</h2>' +
-          '<div class="empty"><p>암기 안 된 단어가 ' +
-          remaining.length +
-          '개뿐이라 퀴즈를 만들 수 없어요. (최소 4개 필요)</p>' +
-          '<p class="hint">' +
-          progressHint +
-          '</p></div>';
         return;
       }
 
@@ -1662,8 +1663,190 @@
       '<div class="quiz-stat"><h3>Day별 암기 완료율</h3><div class="day-progress-list">' +
       dayRows +
       '</div></div>' +
-      customStatsHtml;
+      customStatsHtml +
+      backupHtml();
+    bindBackup();
   }
+
+  // ---------------- 기록 백업 / 불러오기 ----------------
+  // 기록은 이 브라우저에만 저장돼요. 카톡 안 브라우저 ↔ 사파리·크롬처럼 다른 브라우저로 옮길 때 코드로 옮겨요.
+  function exportCode() {
+    var data = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('vocab-') === 0) data[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    return 'ENV1:' + btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  }
+  // 붙여넣을 때 줄바꿈·공백·앞뒤 글자가 섞이거나 앞부분("ENV1:")이 빠져도 읽을 수 있게 너그럽게 처리
+  function importCode(code) {
+    var text = String(code || '');
+    if (text.indexOf('ZHV1:') !== -1 && text.indexOf('ENV1:') === -1) throw new Error('other');
+    var at = text.indexOf('ENV1:');
+    var body = at !== -1 ? (text.slice(at + 5).match(/^[\sA-Za-z0-9+/=]*/) || [''])[0] : text;
+    body = body.replace(/[^A-Za-z0-9+/=]/g, '').replace(/=+(?=[A-Za-z0-9+/])/g, '');
+    var data;
+    try {
+      data = JSON.parse(decodeURIComponent(escape(atob(body))));
+    } catch (e) {
+      throw new Error('bad');
+    }
+    if (!data || typeof data !== 'object') throw new Error('bad');
+    var n = 0;
+    Object.keys(data).forEach(function (k) {
+      if (k.indexOf('vocab-') === 0 && typeof data[k] === 'string') {
+        localStorage.setItem(k, data[k]);
+        n++;
+      }
+    });
+    if (n === 0) throw new Error('empty');
+  }
+  // 코드 앞부분이 잘려서 통째로 못 읽을 때: 남아 있는 조각에서 단어 기록("번호":{correct,wrong,status})만 건져요.
+  function salvageProgress(code) {
+    var at = String(code || '').indexOf('ENV1:');
+    var body = (at !== -1 ? String(code).slice(at + 5) : String(code || '')).replace(/[^A-Za-z0-9+/]/g, '');
+    var best = {};
+    var bestN = 0;
+    for (var d = 0; d < 4; d++) {
+      var t = body.slice(d);
+      t = t.slice(0, t.length - (t.length % 4));
+      var text = '';
+      try {
+        var bin = atob(t);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      } catch (e) {
+        continue;
+      }
+      var found = {};
+      var n = 0;
+      var re = /\\?"(\d+)\\?":\{\\?"correct\\?":(\d+),\\?"wrong\\?":(\d+),\\?"status\\?":\\?"(new|learning|known)\\?"\}/g;
+      var m;
+      while ((m = re.exec(text))) {
+        found[m[1]] = { correct: +m[2], wrong: +m[3], status: m[4] };
+        n++;
+      }
+      if (n > bestN) {
+        best = found;
+        bestN = n;
+      }
+    }
+    return { entries: best, count: bestN };
+  }
+
+  function backupHtml() {
+    return (
+      '<div class="quiz-stat backup-card"><h3>💾 기록 백업</h3>' +
+      '<p class="hint">외운 기록은 지금 쓰는 브라우저에만 저장돼요. 다른 폰·브라우저로 옮기거나 기록이 지워질 때를 대비해 백업 코드를 저장해 두세요.</p>' +
+      '<p class="backup-step">① 기록이 <b>있는</b> 브라우저에서</p>' +
+      '<div class="setup-row"><button class="btn btn-primary" id="backup-copy">백업 코드 복사</button>' +
+      (navigator.share ? '<button class="btn btn-ghost" id="backup-share">📤 메모·카톡으로 보내기</button>' : '') +
+      '</div>' +
+      '<textarea class="backup-text" id="backup-out" readonly placeholder="여기에 이 브라우저의 백업 코드가 나와요"></textarea>' +
+      '<p class="hint" id="backup-copy-msg"></p>' +
+      '<p class="backup-step">② 기록을 <b>옮길</b> 브라우저에서</p>' +
+      '<textarea class="backup-text" id="backup-text" placeholder="복사한 백업 코드를 여기에 붙여넣으세요"></textarea>' +
+      '<div class="setup-row">' +
+      (navigator.clipboard && navigator.clipboard.readText ? '<button class="btn btn-ghost" id="backup-paste">📋 복사한 코드 붙여넣기</button>' : '') +
+      '<button class="btn btn-primary" id="backup-load">불러오기</button></div>' +
+      '<p class="hint" id="backup-msg"></p></div>'
+    );
+  }
+  function bindBackup() {
+    var copyMsg = document.getElementById('backup-copy-msg');
+    var msg = document.getElementById('backup-msg');
+    var out = document.getElementById('backup-out');
+    var ta = document.getElementById('backup-text');
+    document.getElementById('backup-copy').addEventListener('click', function () {
+      var code = exportCode();
+      out.value = code;
+      // 코드 전체가 한눈에 보이게 칸을 늘려요 (일부만 복사되는 것 방지)
+      out.style.height = 'auto';
+      out.style.height = out.scrollHeight + 4 + 'px';
+      out.select();
+      var fallback = function () {
+        copyMsg.textContent = '위 코드를 길게 눌러 전체 선택 후 복사해 주세요.';
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () {
+          copyMsg.textContent = '✅ 복사했어요! 옮길 브라우저에서 이 사이트를 열고 ② 칸에 붙여넣으세요.';
+        }, fallback);
+      } else {
+        fallback();
+      }
+    });
+    // 공유 시트로 코드 전체를 한 번에 보내요 (길게 눌러 선택하다 일부만 복사되는 것 방지)
+    var shareBtn = document.getElementById('backup-share');
+    if (shareBtn)
+      shareBtn.addEventListener('click', function () {
+        var code = exportCode();
+        out.value = code;
+        navigator.share({ text: code }).then(
+          function () {
+            copyMsg.textContent = '✅ 보냈어요! 메모나 카톡에 코드가 통째로 저장됐어요.';
+          },
+          function () {}
+        );
+      });
+    // 클립보드에 있는 코드를 통째로 붙여넣어요
+    var pasteBtn = document.getElementById('backup-paste');
+    if (pasteBtn)
+      pasteBtn.addEventListener('click', function () {
+        navigator.clipboard.readText().then(
+          function (t) {
+            ta.value = t;
+            msg.textContent = t.indexOf('ENV1:') === -1 ? '⚠️ 붙여넣은 내용이 ENV1:로 시작하지 않아요. 코드 앞부분이 잘렸을 수 있어요.' : '붙여넣었어요. 불러오기를 누르세요.';
+          },
+          function () {
+            msg.textContent = '붙여넣기 권한이 없어요. 칸을 길게 눌러 직접 붙여넣어 주세요.';
+          }
+        );
+      });
+    document.getElementById('backup-load').addEventListener('click', function () {
+      try {
+        importCode(ta.value);
+        msg.textContent = '✅ 불러왔어요! 새로고침할게요.';
+        setTimeout(function () {
+          location.reload();
+        }, 600);
+      } catch (e) {
+        if (e.message === 'bad') {
+          var rescued = salvageProgress(ta.value);
+          if (rescued.count > 0) {
+            var ok = confirm(
+              '코드 앞부분이 잘려 있어서 전체를 읽을 수 없어요.\n남아 있는 부분에서 단어 ' +
+                rescued.count +
+                '개의 기록을 찾았어요. 이것만이라도 불러올까요?\n(지금 기록은 지워지지 않고 합쳐져요)'
+            );
+            if (ok) {
+              Object.keys(rescued.entries).forEach(function (id) {
+                state.progress[id] = rescued.entries[id];
+              });
+              saveProgress();
+              render();
+              alert('✅ 단어 ' + rescued.count + '개 기록을 불러왔어요.');
+              return;
+            }
+            msg.textContent =
+              '⚠️ 코드 앞부분이 잘렸어요. 백업 코드는 "ENV1:"로 시작해요. 처음부터 끝까지 전부 복사해서 붙여넣어 주세요.';
+            return;
+          }
+        }
+        msg.textContent =
+          e.message === 'other'
+            ? '⚠️ 중국어 단어장의 백업 코드예요. 중국어 단어장 사이트의 통계 탭에서 불러와 주세요.'
+            : e.message === 'empty'
+            ? '⚠️ 이 코드에는 저장된 기록이 없어요. 기록이 있는 브라우저에서 다시 복사해 주세요.'
+            : ta.value.indexOf('ENV1:') === -1
+            ? '⚠️ 코드 앞부분이 잘렸어요. 백업 코드는 ENV1:로 시작해요. 기록이 있는 브라우저에서 "📤 보내기"나 "백업 코드 복사"로 다시 가져와 주세요.'
+            : '⚠️ 코드 끝부분이 잘렸어요. 코드 전체를 빠짐없이 붙여넣어 주세요.';
+      }
+    });
+  }
+
 
   function render() {
     var active = document.activeElement;

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>감사 일기장</title>
+    <meta name="description" content="긴 색종이에 감사한 일을 적으면 입체 종이별로 접혀 유리병에 쌓이는 감사 일기장." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🫙</text></svg>" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@500;600&family=Gaegu:wght@400;700&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="brand">🫙 감사 일기장</div>
+        <div class="tag" id="jar-count">아직 채워진 별이 없어요</div>
+      </header>
+
+      <section class="jar-card">
+        <div class="jar" id="jar">
+          <div class="jar-ground-shadow"></div>
+          <div class="jar-stars" id="jar-stars"></div>
+
+          <svg class="jar-svg" viewBox="0 0 240 296" aria-hidden="true">
+            <defs>
+              <linearGradient id="glass-grad" x1="0%" y1="0%" x2="15%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12" />
+                <stop offset="100%" stop-color="#dcd6ec" stop-opacity="0.18" />
+              </linearGradient>
+              <linearGradient id="cork-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#e7c99d" />
+                <stop offset="100%" stop-color="#b9895b" />
+              </linearGradient>
+              <filter id="jar-wobble" x="-15%" y="-15%" width="130%" height="130%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="2" seed="4" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+            </defs>
+
+            <g filter="url(#jar-wobble)">
+              <path
+                class="jar-glass"
+                d="M 74 54
+                   C 52 54 40 66 40 96
+                   L 40 240
+                   C 40 258 54 270 74 270
+                   L 166 270
+                   C 186 270 200 258 200 240
+                   L 200 96
+                   C 200 66 188 54 166 54
+                   Z"
+              />
+              <rect class="jar-neck-ring" x="74" y="40" width="92" height="14" rx="5" />
+              <rect class="jar-cork" x="86" y="8" width="68" height="34" rx="10" />
+              <ellipse class="jar-cork-top" cx="120" cy="8" rx="34" ry="7" />
+              <path class="jar-cork-texture" d="M 96 18 L 106 15" />
+              <path class="jar-cork-texture" d="M 112 24 L 124 21" />
+              <path class="jar-cork-texture" d="M 130 16 L 140 19" />
+              <path class="jar-cork-texture" d="M 100 30 L 110 33" />
+              <path class="jar-cork-texture" d="M 122 34 L 134 31" />
+              <path class="jar-cork-texture" d="M 138 27 L 146 30" />
+            </g>
+
+            <path class="jar-shine-pink" d="M 62 112 C 56 152 56 194 64 228" />
+            <path class="jar-shine-blue" d="M 148 110 C 155 152 155 194 146 228" />
+            <path class="jar-shine-thin" d="M 92 118 C 88 156 88 196 94 222" />
+          </svg>
+        </div>
+        <p class="jar-hint">색종이에 감사를 적어 별을 접어보세요</p>
+      </section>
+
+      <div class="action-row">
+        <button id="write-btn" class="primary-btn" type="button">✏️ 감사일기 쓰기</button>
+        <button id="draw-btn" class="ghost-btn" type="button" disabled>⭐ 별 꺼내보기</button>
+      </div>
+    </div>
+
+    <!-- 작성 모달 -->
+    <div class="modal-overlay" id="write-modal" hidden>
+      <div class="modal-card" id="write-card" data-stage="write">
+        <button class="modal-close" id="write-close" type="button" aria-label="닫기">✕</button>
+
+        <div class="stage stage-write">
+          <h2>오늘 감사한 일을 적어보세요</h2>
+          <p class="modal-desc">긴 색종이에 한 줄씩 적으면 종이별로 접혀 유리병에 담겨요.</p>
+
+          <div class="strip-input-wrap">
+            <span class="strip-glyph">✱</span>
+            <textarea
+              id="entry-input"
+              class="entry-input"
+              rows="2"
+              maxlength="120"
+              placeholder="예: 오늘 점심에 먹은 김치찌개가 맛있었다"
+            ></textarea>
+            <span class="strip-date-corner" id="entry-date"></span>
+          </div>
+
+          <ul class="strip-list" id="pending-list"></ul>
+
+          <div class="modal-btn-row">
+            <button id="add-more-btn" class="secondary-btn" type="button">➕ 추가로 적기</button>
+            <button id="done-btn" class="secondary-btn" type="button">완료</button>
+          </div>
+        </div>
+
+        <div class="stage stage-review">
+          <h2>별이 될 준비가 됐어요</h2>
+          <p class="modal-desc"><span id="review-count">0</span>개의 색종이가 별로 접힐 거예요.</p>
+          <ul class="strip-list" id="review-list"></ul>
+          <div class="modal-btn-row">
+            <button id="back-to-write-btn" class="secondary-btn" type="button">✏️ 다시 쓰기</button>
+            <button id="save-jar-btn" class="primary-btn" type="button">🫙 유리병에 저장하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 별 꺼내기 모달 -->
+    <div class="modal-overlay" id="draw-modal" hidden>
+      <div class="modal-card star-reveal">
+        <button class="modal-close" id="draw-close" type="button" aria-label="닫기">✕</button>
+        <div class="reveal-star" id="reveal-star"></div>
+        <p class="reveal-date" id="reveal-date"></p>
+        <p class="reveal-text" id="reveal-text"></p>
+        <div class="modal-btn-row">
+          <button id="draw-again-btn" class="secondary-btn" type="button">🔀 다른 별 뽑기</button>
+          <button id="reveal-delete-btn" class="danger-btn" type="button">🗑 지우기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
