@@ -2,6 +2,7 @@
   var STORAGE_KEY = 'vocab-progress-v1';
   var CUSTOM_WORDS_KEY = 'vocab-custom-words-v1';
   var CUSTOM_CATEGORIES_KEY = 'vocab-custom-categories-v1';
+  var WRITE_PROGRESS_KEY = 'vocab-write-progress-v1';
   var TOTAL_DAYS = 30;
 
   function loadProgress() {
@@ -39,6 +40,54 @@
   function resetProgress() {
     state.progress = {};
     saveProgress();
+  }
+
+  function emptyWriteEntry() {
+    return { spelling: { correct: 0, wrong: 0 }, meaning: { correct: 0, wrong: 0 } };
+  }
+  function loadWriteProgress() {
+    try {
+      var raw = localStorage.getItem(WRITE_PROGRESS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveWriteProgress() {
+    try {
+      localStorage.setItem(WRITE_PROGRESS_KEY, JSON.stringify(state.writeProgress));
+    } catch (e) {}
+  }
+  function getWriteEntry(id) {
+    return state.writeProgress[id] || emptyWriteEntry();
+  }
+  function recordWriteResult(id, mode, isCorrect) {
+    var entry = state.writeProgress[id] || emptyWriteEntry();
+    var sub = entry[mode] || { correct: 0, wrong: 0 };
+    entry[mode] = {
+      correct: (sub.correct || 0) + (isCorrect ? 1 : 0),
+      wrong: (sub.wrong || 0) + (isCorrect ? 0 : 1),
+    };
+    state.writeProgress[id] = entry;
+    saveWriteProgress();
+  }
+  function isWriteMastered(entry, mode) {
+    return (entry[mode].correct || 0) >= MASTERED_THRESHOLD;
+  }
+  function resetWriteProgress() {
+    state.writeProgress = {};
+    saveWriteProgress();
+  }
+  function matchesMeaning(input, ko) {
+    var norm = function (s) {
+      return String(s).trim().toLowerCase().replace(/\s+/g, '');
+    };
+    var inputNorm = norm(input);
+    if (!inputNorm) return false;
+    var segments = ko.split(',').map(norm);
+    return segments.some(function (seg) {
+      return seg.length > 0 && (seg === inputNorm || seg.indexOf(inputNorm) !== -1 || inputNorm.indexOf(seg) !== -1);
+    });
   }
 
   function loadCustomWords() {
@@ -96,6 +145,7 @@
     day: 'all',
     tab: 'cards',
     progress: loadProgress(),
+    writeProgress: loadWriteProgress(),
     customWords: loadCustomWords(),
     customCategories: loadCustomCategories(),
     cardFilter: 'all',
@@ -103,7 +153,7 @@
     cardIndex: 0,
     cardFlipped: false,
     quiz: { stage: 'setup', mode: 'en2ko', questions: [], index: 0, selected: null, score: 0, wrong: [] },
-    write: { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] },
+    write: { stage: 'setup', mode: 'spelling', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] },
     wordQuery: '',
     wordStatus: 'all',
     confirmingReset: false,
@@ -302,7 +352,7 @@
         }
         buildDeck();
         state.quiz = { stage: 'setup', mode: state.quiz.mode, questions: [], index: 0, selected: null, score: 0, wrong: [] };
-        state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
+        state.write = { stage: 'setup', mode: state.write.mode, items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         render();
       });
     }
@@ -337,7 +387,7 @@
           state.quiz = { stage: 'setup', mode: state.quiz.mode, questions: [], index: 0, selected: null, score: 0, wrong: [] };
         }
         if (state.tab === 'write') {
-          state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
+          state.write = { stage: 'setup', mode: state.write.mode, items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         }
         render();
       });
@@ -775,45 +825,115 @@
     }
   }
 
-  function writeSetupCounts() {
-    var poolSize = getPool().length;
-    var options = [10, 20, 50];
-    return options
-      .filter(function (n) {
-        return n <= poolSize;
-      })
-      .concat([poolSize]);
-  }
+  var WRITE_MODE_LABEL = { spelling: '스펠링 쓰기', meaning: '뜻 쓰기' };
 
   function renderWrite() {
     var panel = document.getElementById('panel');
     var w = state.write;
+    var mode = w.mode === 'meaning' ? 'meaning' : 'spelling';
 
     if (w.stage === 'setup') {
-      var poolSize = getPool().length;
-      if (poolSize < 1) {
-        panel.innerHTML = '<h2>스펠링 쓰기 연습</h2><div class="empty"><p>이 범위에는 아직 단어가 없어요.</p></div>';
+      var pool = getPool();
+      if (pool.length === 0) {
+        panel.innerHTML = '<h2>쓰기 연습</h2><div class="empty"><p>이 범위에는 아직 단어가 없어요.</p></div>';
         return;
       }
-      var counts = writeSetupCounts();
+      var spellingMasteredCount = pool.filter(function (w2) {
+        return isWriteMastered(getWriteEntry(w2.id), 'spelling');
+      }).length;
+      var meaningMasteredCount = pool.filter(function (w2) {
+        return isWriteMastered(getWriteEntry(w2.id), 'meaning');
+      }).length;
+      var bothMasteredCount = pool.filter(function (w2) {
+        var e = getWriteEntry(w2.id);
+        return isWriteMastered(e, 'spelling') && isWriteMastered(e, 'meaning');
+      }).length;
+      var progressHint =
+        '스펠링 암기 ' +
+        spellingMasteredCount +
+        '/' +
+        pool.length +
+        ' · 뜻 암기 ' +
+        meaningMasteredCount +
+        '/' +
+        pool.length +
+        ' · 완전 암기 ' +
+        bothMasteredCount +
+        '/' +
+        pool.length;
+
+      var remaining = pool.filter(function (w2) {
+        return !isWriteMastered(getWriteEntry(w2.id), mode);
+      });
+      var modeRowHtml =
+        '<div class="setup-row mode-row" style="margin-bottom:14px;">' +
+        '<button class="btn ' +
+        (mode === 'meaning' ? 'btn-ghost' : 'btn-primary') +
+        '" data-write-mode="spelling">스펠링 쓰기</button>' +
+        '<button class="btn ' +
+        (mode === 'meaning' ? 'btn-primary' : 'btn-ghost') +
+        '" data-write-mode="meaning">뜻 쓰기</button>' +
+        '</div>';
+
+      if (remaining.length === 0) {
+        panel.innerHTML =
+          '<h2>쓰기 연습</h2>' +
+          modeRowHtml +
+          '<div class="empty"><p>🎉 이 범위 ' +
+          WRITE_MODE_LABEL[mode] +
+          '를 모두 암기했어요!</p>' +
+          '<p class="hint">' +
+          progressHint +
+          '</p>' +
+          '<button class="btn btn-primary" id="write-review-all-btn" style="flex:none;padding:12px 20px;">전체 다시 복습하기</button></div>';
+        bindWriteModeButtons();
+        document.getElementById('write-review-all-btn').addEventListener('click', function () {
+          state.write = {
+            stage: 'playing',
+            mode: mode,
+            items: shuffle(pool),
+            index: 0,
+            input: '',
+            submitted: false,
+            score: 0,
+            wrong: [],
+          };
+          render();
+        });
+        return;
+      }
+
+      var counts = [10, 20, 50, remaining.length].filter(function (n, idx, arr) {
+        return n <= remaining.length && arr.indexOf(n) === idx;
+      });
       panel.innerHTML =
-        '<h2>스펠링 쓰기 연습</h2>' +
-        '<p class="hint" style="margin-bottom:16px;">뜻을 보고 영단어 스펠링을 입력하세요 (' +
-        poolSize +
+        '<h2>쓰기 연습</h2>' +
+        modeRowHtml +
+        '<p class="hint" style="margin-bottom:16px;">' +
+        (mode === 'meaning' ? '영단어를 보고 뜻을 한글로 입력하세요' : '뜻을 보고 영단어 스펠링을 입력하세요') +
+        ' (' +
+        remaining.length +
         '개 단어 중에서 출제)</p>' +
         '<div class="setup-row">' +
         counts
           .map(function (n) {
-            return '<button class="btn btn-primary" data-count="' + n + '">' + (n === poolSize ? '전체' : n + '문제') + '</button>';
+            return (
+              '<button class="btn btn-primary" data-count="' + n + '">' + (n === remaining.length ? '전체' : n + '문제') + '</button>'
+            );
           })
           .join('') +
-        '</div>';
+        '</div>' +
+        '<p class="hint" style="margin-top:14px;">' +
+        progressHint +
+        '</p>';
+      bindWriteModeButtons();
       Array.prototype.forEach.call(panel.querySelectorAll('[data-count]'), function (btn) {
         btn.addEventListener('click', function () {
           var count = parseInt(btn.getAttribute('data-count'), 10);
           state.write = {
             stage: 'playing',
-            items: shuffle(getPool()).slice(0, count),
+            mode: mode,
+            items: shuffle(remaining).slice(0, count),
             index: 0,
             input: '',
             submitted: false,
@@ -866,6 +986,7 @@
           });
           state.write = {
             stage: 'playing',
+            mode: mode,
             items: shuffle(wrongWords),
             index: 0,
             input: '',
@@ -877,7 +998,7 @@
         });
       }
       document.getElementById('retry-write-all').addEventListener('click', function () {
-        state.write = { stage: 'setup', items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
+        state.write = { stage: 'setup', mode: mode, items: [], index: 0, input: '', submitted: false, score: 0, wrong: [] };
         render();
       });
       return;
@@ -885,7 +1006,11 @@
 
     var current = w.items[w.index];
     var isLast = w.index === w.items.length - 1;
-    var isCorrect = w.submitted && normalizeAnswer(w.input) === normalizeAnswer(current.en);
+    var isMeaningMode = mode === 'meaning';
+    var promptText = isMeaningMode ? current.en : current.ko;
+    var promptLabel = isMeaningMode ? '위 영단어의 뜻을 한글로 입력하세요' : '위 뜻에 해당하는 영단어 스펠링을 입력하세요';
+    var correctAnswerText = isMeaningMode ? current.ko : current.en;
+    var isCorrect = w.submitted && (isMeaningMode ? matchesMeaning(w.input, current.ko) : normalizeAnswer(w.input) === normalizeAnswer(current.en));
 
     panel.innerHTML =
       '<p class="meta">' +
@@ -898,9 +1023,11 @@
       esc(dayBadge(current)) +
       '</span>' +
       '<h2 class="write-ko">' +
-      esc(current.ko) +
+      esc(promptText) +
       '</h2>' +
-      '<p class="hint">위 뜻에 해당하는 영단어 스펠링을 입력하세요</p>' +
+      '<p class="hint">' +
+      promptLabel +
+      '</p>' +
       '</div>' +
       '<input type="text" id="write-input" class="write-input ' +
       (w.submitted ? (isCorrect ? 'correct' : 'wrong') : '') +
@@ -913,7 +1040,7 @@
         ? '<p class="write-feedback ' +
           (isCorrect ? 'good' : 'bad') +
           '">' +
-          (isCorrect ? '✅ 정답이에요!' : '❌ 정답: ' + esc(current.en)) +
+          (isCorrect ? '✅ 정답이에요!' : '❌ 정답: ' + esc(correctAnswerText)) +
           '</p>' +
           '<button class="btn btn-primary" id="write-next">' +
           (isLast ? '결과 보기' : '다음 문제') +
@@ -943,10 +1070,20 @@
       });
     }
 
+    function bindWriteModeButtons() {
+      Array.prototype.forEach.call(panel.querySelectorAll('[data-write-mode]'), function (btn) {
+        btn.addEventListener('click', function () {
+          w.mode = btn.getAttribute('data-write-mode');
+          render();
+        });
+      });
+    }
+
     function submitWrite() {
-      var correct = normalizeAnswer(w.input) === normalizeAnswer(current.en);
+      var correct = isMeaningMode ? matchesMeaning(w.input, current.ko) : normalizeAnswer(w.input) === normalizeAnswer(current.en);
       w.submitted = true;
       recordResult(current.id, correct);
+      recordWriteResult(current.id, mode, correct);
       if (correct) {
         w.score++;
       } else {
@@ -1028,6 +1165,7 @@
     if (state.confirmingReset) {
       document.getElementById('reset-confirm-yes').addEventListener('click', function () {
         resetProgress();
+        resetWriteProgress();
         state.confirmingReset = false;
         buildDeck();
         render();
